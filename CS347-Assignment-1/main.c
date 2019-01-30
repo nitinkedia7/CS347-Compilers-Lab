@@ -6,5 +6,7 @@
 
 void main ()
 {
-	statements ();
+	// statements ();
+	// char * tempvar = expression();
+	char * tempvar = stmt_list();
 }
