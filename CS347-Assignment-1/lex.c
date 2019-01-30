@@ -66,6 +66,7 @@ int lex(void){
                   current--;
                   fprintf(stderr, "inserting missing '=' after ':'\n");
                }
+               yyleng++;
                return ASSIGN;
             case '=':
                return EQUAL;

@@ -8,5 +8,5 @@ void main ()
 {
 	// statements ();
 	// char * tempvar = expression();
-	char * tempvar = stmt_list();
+	stmt_list();
 }
