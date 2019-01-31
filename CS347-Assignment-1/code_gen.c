@@ -5,58 +5,64 @@
 char *factor(void);
 char *term(void);
 char *expression(void);
-char *stmt(void);
+void stmt(void);
 char *expr(void);
-char *opt_stmts(void);
+void stmt_list(void);
 
 extern char *newname(void);
 extern void freename(char *name);
+int assignment_found;
 
-void stmt_list(void)
-{
-    /* stmt_list -> stmt stmt_list'
-       stmt_list' -> SEMI stmt stmt_list' |  epsilon */
-
-    char *tempvar, *tempvar2;
-    tempvar = stmt();
-    while (match(SEMI))
-    {
-        advance();
-        tempvar2 = stmt();
-        freename(tempvar2);
+void statements(void){
+    // statements -> stmt statements | stmt
+    // stmt();
+    while(!match(EOI)){
+        printf("statements hjgk\n");
+        // char* tempvar = stmt();
+        stmt();
+        // freename(tempvar);
     }
-    freename(tempvar);
+
 }
 
-char *stmt(void)
+void stmt(void)
 {
     /* stmt -> id := expr
             | if expr then stmt
             | while expr do stmt
             | begin opt_stmts end */
-
+    // printf("stmt");
     char *tempvar, *tempvar2;
     if (match(NUM_OR_ID))
     {
         advance();
+        printf("assign above\n");
         if (match(ASSIGN))
         {
             char *var = malloc(yyleng + 1);
             strncpy(var, idname, yyleng);
             advance();
+            assignment_found = 1;
             tempvar = expr();
+            if(!match(SEMI)){
+                fprintf( stderr, "%d: Inserting missing semicolon\n", yylineno );
+            }
+            advance();
             printf("    %s := %s\n", var, tempvar);
-            // freename(tempvar);
         }
     }
     else if (match(IF))
     {
+        printf("if\n");
         advance();
         tempvar = expr();
+
         if (match(THEN))
         {
+            printf("then\n");
             advance();
-            tempvar2 = stmt();
+            stmt();
+            // tempvar2 = stmt();
         }
         else
         {
@@ -67,62 +73,93 @@ char *stmt(void)
     {
         advance();
         tempvar = expr();
+
         if (match(DO))
         {
             advance();
-            tempvar2 = stmt();
+            // tempvar2 = stmt();
+            stmt();        
         }
         else
         {
             fprintf(stderr, "error!!");
         }
-        tempvar2 = stmt();
+        // tempvar2 = stmt();
     }
     else if (match(BEGIN))
     {
         advance();
-        opt_stmts();
+        stmt_list();
     }
-    return tempvar;
+    // return tempvar;
+}
+
+void stmt_list(void)
+{
+    /* stmt_list -> stmt stmt_list'
+       stmt_list' -> stmt stmt_list' |  epsilon */
+
+    char *tempvar, *tempvar2;
+    // tempvar = stmt();
+    while (!match(END))
+    {
+        printf("stmt caught\n");
+        stmt();
+        // tempvar = stmt();
+        // freename(tempvar);
+    }
+    advance();
+    // assert(match(END));
+    // freename(tempvar);
+    return;
 }
 
 char *expr(void)
 {
-    /*expr -> (expression GREAT expression)
-            | (expression LESS expression)
-            | (expression EQUAL expression)
+    /*expr -> expression GREAT expression
+            | expression LESS expression
+            | expression EQUAL expression
             | expression */
 
+    // printf("aaya\n");
     char *tempvar, *tempvar2;
     tempvar = expression();
+    printf("comparing\n");
     if (match(GREAT))
     {
         advance();
         tempvar2 = expression();
+        printf(" %s -= %s\n", tempvar, tempvar2);
+        if(assignment_found){
+            assignment_found = 0;
+        }
         freename(tempvar2);
     }
     else if (match(LESS))
     {
         advance();
         tempvar2 = expression();
+        printf(" %s -= %s\n", tempvar, tempvar2);
+        if(assignment_found){
+            assignment_found = 0;
+        }
         freename(tempvar2);
     }
     else if (match(EQUAL))
     {
         advance();
         tempvar2 = expression();
+        printf(" %s -= %s\n", tempvar, tempvar2);
+        if(assignment_found){
+            assignment_found = 0;
+        }
         freename(tempvar2);
     }
-    return tempvar;
-}
+    else {
+        printf(" %s -= 0\n", tempvar);
+    }
 
-char *opt_stmts(void)
-{
-    /* opt_stmts -> stmt_list |  epsilon */
-    stmt_list();
-    // char *tempvar;
-    // tempvar = stmt_list();
-    // return tempvar;
+    return tempvar;
 }
 
 char *expression()
@@ -132,30 +169,62 @@ char *expression()
      */
 
     char *tempvar, *tempvar2;
-
+    // printf("upar");
     tempvar = term();
-
-    while (match(PLUS))
+    // printf("expre");
+    while (match(PLUS) || match(MINUS))
     {
+        printf("plus");
+        int type;
+        if(match(PLUS)) {
+            type = PLUS;
+        }
+        else {
+            type = MINUS;
+        }
         advance();
         tempvar2 = term();
-        printf("    %s += %s\n", tempvar, tempvar2);
+        if(type == PLUS) {
+            printf("    %s += %s\n", tempvar, tempvar2);
+        }
+        else{
+            printf("    %s -= %s\n", tempvar, tempvar2);
+        }
+        
         freename(tempvar2);
     }
-
+    // while( match(PLUS)){
+    //     advance();
+    //     tempvar2 =term();
+    //     printf("   %s += %s\n", tempvar, tempvar2 );
+    //     freename( tempvar2 );
+    // }
+    // printf("niche %s\n", tempvar);
     return tempvar;
 }
 
 char *term()
 {
     char *tempvar, *tempvar2;
-
+    printf("term hua\n");
     tempvar = factor();
-    while (match(TIMES))
+    while (match(TIMES) || match(DIVIDE))
     {
+        int type;
+        if(match(TIMES)) {
+            type = TIMES;
+        }
+        else {
+            type = DIVIDE;
+        }
         advance();
         tempvar2 = factor();
-        printf("    %s *= %s\n", tempvar, tempvar2);
+        if(type == TIMES){
+            printf("    %s *= %s\n", tempvar, tempvar2);
+        }
+        else{
+            printf("    %s /= %s\n", tempvar, tempvar2);
+        }
         freename(tempvar2);
     }
 
@@ -165,7 +234,7 @@ char *term()
 char *factor()
 {
     char *tempvar;
-    // printf("factor");
+    // printf("factor hua\n");
     if (match(NUM_OR_ID))
     {
         /* Print the assignment instruction. The %0.*s conversion is a form of
@@ -176,12 +245,13 @@ char *factor()
 	 * to print the string. The ".*" tells printf() to take the maximum-
 	 * number-of-characters count from the next argument (yyleng).
 	 */
-
+        printf("factor 1 hua\n");
         printf("    %s = %0.*s\n", tempvar = newname(), yyleng, yytext);
         advance();
     }
     else if (match(LP))
-    {
+    {   
+        printf("factor 2 hua\n");
         advance();
         tempvar = expression();
         if (match(RP))
@@ -189,8 +259,9 @@ char *factor()
         else
             fprintf(stderr, "%d: Mismatched parenthesis\n", yylineno);
     }
-    else
+    else{
+        printf("factor 3 hua\n");
         fprintf(stderr, "%d: Number or identifier expected\n", yylineno);
-
+    }
     return tempvar;
 }

@@ -17,6 +17,7 @@
 #define DO          16
 #define BEGIN       17
 #define END         18
+#define ID          19
 
 extern char *yytext;		/* in lex.c			*/
 extern int yyleng;

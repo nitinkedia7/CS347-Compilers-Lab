@@ -11,10 +11,9 @@ int yylineno = 0;  /* Input line number        */
 char* idname = "";
 
 int lex(void){
-
    static char input_buffer[1024];
    char        *current;
-
+   
    current = yytext + yyleng; /* Skip current
                                  lexeme        */
 
@@ -39,7 +38,7 @@ int lex(void){
          /* Get the next token */
          yytext = current;
          yyleng = 1;
-         // printf("%c\n", *yytext);
+         printf("%c\n", *yytext);
          switch( *current ){
             case ';':
                return SEMI;
@@ -61,7 +60,7 @@ int lex(void){
                return GREAT;
             case ':':
                current++;
-               // printf("%c", *current);
+               printf("%c special", *current);
                if(*current != '='){
                   current--;
                   fprintf(stderr, "inserting missing '=' after ':'\n");
@@ -75,23 +74,32 @@ int lex(void){
             case ' ' :
                break;
             default:
-               if(!isalnum(*current))
+               
+               if(!isalnum(*current)){
+                  // printf("scanning 1 b\n");
                   fprintf(stderr, "Not alphanumeric <%c>\n", *current);
+               }
                else{
+                  // printf("scanning 2 b\n");
                   while(isalnum(*current)){
                      ++current;
                   }
                   yyleng = current - yytext;
                   char *tokens[] = {"if", "then", "while", "do", "begin", "end"};
                   int returnvals[] = {IF, THEN, WHILE, DO, BEGIN, END};
+                  int lengths[] = {2,4,5,2,5,3};
                   int i=0;
+                  printf("location 1\n");                  
                   for(i=0; i<6; i++){
-                     if(strncmp(yytext, tokens[i], yyleng)==0){
+                     if(strncmp(yytext, tokens[i],yyleng)==0 && yyleng == lengths[i]){
+                        printf("keyword %d\n", i);
                         return returnvals[i];
                      }
                   }
                   idname = (char *) malloc(yyleng+1);
+                  // fprintf();
                   strncpy(idname, yytext, yyleng);
+                  printf("location 3\n"); 
                   return NUM_OR_ID;
                }
             break;
