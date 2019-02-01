@@ -1,4 +1,3 @@
-// #include "linked-list.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,8 +31,6 @@ bool present(symbol *symbol_list, char idname[32], int len) {
     }   
     return false;
 }
-
-
 
 // int main() {
 //     symbol *symbol_list = NULL;

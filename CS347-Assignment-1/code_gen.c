@@ -2,27 +2,50 @@
 #include "name.c"
 #include "lex.c"
 
-char *factor(void);
-char *term(void);
-char *expression(void);
 void stmt(void);
-char *expr(int);
 void stmt_list(void);
+char *expr(int);
+char *expression(void);
+char *term(void);
+char *factor(void);
 
 extern char *newname(void);
 extern void freename(char *name);
-int assignment_found;
+
+FILE *outasm, *outinter, *outtemp;
+int if_label = 0;
+int while_label = 0;
+int comp_label = 0;
 
 void statements(void){
-    // statements -> stmt statements | stmt
-    // stmt();
-    while(!match(EOI)){
-        // printf("statements hjgk\n");
-        // char* tempvar = stmt();
-        stmt();
-        // freename(tempvar);
-    }
+    /* statements -> stmt statements | stmt */
 
+    outtemp = fopen("assembly.temp", "w+");
+    outinter = fopen("intermediate.inter", "w");
+    outasm = fopen("assembly.asm", "w");
+    
+    while(!match(EOI)){
+        stmt();
+    }
+    fprintf(outtemp, "END\n");
+    // rewind(outtemp);
+    fprintf(outasm, "org 100h\n");
+    fprintf(outasm, ".DATA\n");
+    symbol* temp_symbol = symbol_list;
+    while(temp_symbol!=NULL){
+        fprintf(outasm, "%s DB ?\n", temp_symbol->idname);
+        temp_symbol = temp_symbol->ptr;
+    }
+    fprintf(outasm, ".CODE\n");
+    rewind(outtemp);
+    char copy_byte;
+    while((copy_byte = fgetc(outtemp))!=EOF){
+        fputc(copy_byte, outasm);
+    }
+    fclose(outasm);
+    fclose(outtemp);
+    fclose(outinter);
+    remove("assembly.temp");
 }
 
 void stmt(void)
@@ -31,7 +54,7 @@ void stmt(void)
             | if expr then stmt
             | while expr do stmt
             | begin opt_stmts end */
-    // printf("stmt");
+
     char *tempvar, *tempvar2;
     if (match(NUM_OR_ID))
     {
@@ -42,22 +65,20 @@ void stmt(void)
         }
         else {
             fprintf(stderr, "%d: Cannot assign value to integer %s\n", yylineno, idname);
-            exit(0);
-        }
+        }  
         advance();
-        // printf("assign above\n");
         if (match(ASSIGN))
         {
-            char *var = malloc(yyleng + 1);
+            char var[32];
             strncpy(var, idname, yyleng);
             advance();
-            assignment_found = 1;
             tempvar = expr(0);
             if(!match(SEMI)){
                 fprintf( stderr, "%d: Inserting missing semicolon\n", yylineno );
             }
             advance();
-            printf("%s = %s\n", var, tempvar);
+            fprintf(outinter, "%s = %s\n", var, tempvar);
+            fprintf(outtemp, "MOV %s, %s\n", var, tempvar);
             freename(tempvar);
         }
     }
@@ -66,63 +87,66 @@ void stmt(void)
         advance();
         tempvar = expr(1);
         freename(tempvar);
+        int curr_label = if_label;
+        if_label++;
         if (match(THEN))
         {
-            // printf("then\n");
             advance();
             stmt();
-            // tempvar2 = stmt();
-            printf("}\n");
+            fprintf(outinter, "}\n");
+            fprintf(outtemp, "line_%d:\n", curr_label); 
         }
         else
         {
-            fprintf(stderr, "error!!");
+            fprintf(stderr, "%d: Missing then after if\n", yylineno);
         }
+               
     }
     else if (match(WHILE))
     {
         advance();
+        int curr_label = while_label;
+        int cond_label = if_label;
+        while_label++;
+
+        fprintf(outtemp, "while_%d:\n", curr_label);
         tempvar = expr(2);
         freename(tempvar);
+        if_label++;
+        
         if (match(DO))
         {
             advance();
-            // tempvar2 = stmt();
             stmt();
-            printf("}\n");        
+            fprintf(outtemp, "JMP while_%d\n", curr_label);
+            fprintf(outtemp, "line_%d:\n", cond_label);
+            fprintf(outinter, "}\n");        
         }
         else
         {
-            fprintf(stderr, "error!!");
+            fprintf(stderr, "%d: Missing do after while\n", yylineno);
         }
-        // tempvar2 = stmt();
     }
     else if (match(BEGIN))
     {
         advance();
         stmt_list();
     }
-    // return tempvar;
-    // freename(tempvar);
+    return;
 }
 
 void stmt_list(void)
 {
     /* stmt_list -> stmt stmt_list'
-       stmt_list' -> stmt stmt_list' |  epsilon */
+       stmt_list' -> stmt stmt_list' |  END */
 
     char *tempvar, *tempvar2;
-    // tempvar = stmt();
+
     while (!match(END))
     {
-        // printf("stmt caught\n");
         stmt();
-        // tempvar = stmt();
-        // freename(tempvar);
     }
     advance();
-    // assert(match(END));
-    // freename(tempvar);
     return;
 }
 
@@ -133,21 +157,30 @@ char *expr(int flag)
             | expression EQUAL expression
             | expression */
 
-    // printf("aaya\n");
     char *tempvar, *tempvar2;
     tempvar = expression();
-    // printf("comparing\n");
     if (match(GREAT))
     {
         advance();
         tempvar2 = expression();
-        // printf("    %s -= %s\n", tempvar, tempvar2);
-        if (flag == 1)  printf("if (%s > %s) {\n", tempvar, tempvar2);
-        else if (flag == 2) printf("while (%s > %s) {\n", tempvar, tempvar2);
-        else if (flag == 0) printf("%s > %s\n", tempvar, tempvar2);
-
-        if(assignment_found){
-            assignment_found = 0;
+        if (flag == 1){  
+            fprintf(outinter, "if (%s > %s) {\n", tempvar, tempvar2);
+            fprintf(outtemp, "CMP %s, %s\n", tempvar,tempvar2);
+            fprintf(outtemp, "JNG line_%d\n", if_label);
+        } 
+        else if (flag == 2){
+            fprintf(outinter, "while (%s > %s) {\n", tempvar, tempvar2);
+            fprintf(outtemp, "CMP %s, %s\n", tempvar,tempvar2);
+            fprintf(outtemp, "JNG line_%d\n", if_label);
+        }
+        else if (flag == 0){
+            fprintf(outinter, "%s > %s\n", tempvar, tempvar2);
+            fprintf(outtemp, "CMP %s, %s\n", tempvar, tempvar2);
+            fprintf(outtemp, "MOV %s, 0\n", tempvar);            
+            fprintf(outtemp, "JNG line_%d\n", if_label);
+            fprintf(outtemp, "MOV %s, 1\n", tempvar);
+            fprintf(outtemp, "line_%d:\n", if_label);
+            if_label++;      
         }
         freename(tempvar2);
     }
@@ -155,12 +188,24 @@ char *expr(int flag)
     {
         advance();
         tempvar2 = expression();
-        // printf("    %s -= %s\n", tempvar, tempvar2);
-        if (flag == 1)  printf("if (%s < %s) {\n", tempvar, tempvar2);
-        else if (flag == 2) printf("while (%s < %s) {\n", tempvar, tempvar2);
-        else if (flag == 0) printf("%s < %s\n", tempvar, tempvar2);
-        if(assignment_found){
-            assignment_found = 0;
+        if (flag == 1)  {
+            fprintf(outinter, "if (%s < %s) {\n", tempvar, tempvar2);
+            fprintf(outtemp, "CMP %s, %s\n", tempvar,tempvar2);
+            fprintf(outtemp, "JNL line_%d\n", if_label);
+        }
+        else if (flag == 2) {
+            fprintf(outinter, "while (%s < %s) {\n", tempvar, tempvar2);
+            fprintf(outtemp, "CMP %s, %s\n", tempvar,tempvar2);
+            fprintf(outtemp, "JNL line_%d\n", if_label);
+        }
+        else if (flag == 0) {
+            fprintf(outinter, "%s < %s\n", tempvar, tempvar2);
+            fprintf(outtemp, "CMP %s, %s\n", tempvar, tempvar2);
+            fprintf(outtemp, "MOV %s, 0\n", tempvar);            
+            fprintf(outtemp, "JNL line_%d\n", if_label);
+            fprintf(outtemp, "MOV %s, 1\n", tempvar);
+            fprintf(outtemp, "line_%d:\n", if_label);
+            if_label++;
         }
         freename(tempvar2);
     }
@@ -168,38 +213,51 @@ char *expr(int flag)
     {
         advance();
         tempvar2 = expression();
-        // printf("    %s -= %s\n", tempvar, tempvar2);
-        if (flag == 1)  printf("if (%s == %s) {\n", tempvar, tempvar2);
-        else if (flag == 2) printf("while (%s == %s) {\n", tempvar, tempvar2);
-        else if (flag == 0) printf("%s == %s\n", tempvar, tempvar2);
-        if(assignment_found){
-            assignment_found = 0;
+        if (flag == 1)  {
+            fprintf(outinter, "if (%s == %s) {\n", tempvar, tempvar2);
+            fprintf(outtemp, "CMP %s, %s\n", tempvar,tempvar2);
+            fprintf(outtemp, "JNE line_%d\n", if_label);
+        }
+        else if (flag == 2) {
+            fprintf(outinter, "while (%s == %s) {\n", tempvar, tempvar2);
+            fprintf(outtemp, "CMP %s, %s\n", tempvar,tempvar2);
+            fprintf(outtemp, "JNE line_%d\n", if_label);
+        }
+        else if (flag == 0) {
+            fprintf(outinter, "%s == %s\n", tempvar, tempvar2);
+            fprintf(outtemp, "CMP %s, %s\n", tempvar, tempvar2);
+            fprintf(outtemp, "MOV %s, 0\n", tempvar);            
+            fprintf(outtemp, "JNE line_%d\n", if_label);
+            fprintf(outtemp, "MOV %s, 1\n", tempvar);
+            fprintf(outtemp, "line_%d:\n", if_label);
+            if_label++;
         }
         freename(tempvar2);
     }
     else {
-        if (flag == 1)  printf("if (%s) {\n", tempvar);
-        else if (flag == 2) printf("while (%s) {\n", tempvar);
-        // else if (flag == 0) printf("%s > %s\n", tempvar, tempvar2);
-        // printf("(%s)\n", tempvar);
+        if (flag == 1)  {
+            fprintf(outinter, "if (%s) {\n", tempvar);
+            fprintf(outtemp, "CMP %s, 0\n", tempvar);
+            fprintf(outtemp, "JE line_%d\n", if_label);
+        }
+        else if (flag == 2){
+            fprintf(outinter, "while (%s) {\n", tempvar);
+            fprintf(outtemp, "CMP %s, 0\n", tempvar);
+            fprintf(outtemp, "JE line_%d\n", if_label);
+        }
     }
-
     return tempvar;
 }
 
-char *expression()
+char *expression(void)
 {
     /* expression -> term expression'
-     * expression' -> PLUS term expression' |  epsilon
-     */
+     * expression' -> PLUS term expression' |  epsilon */
 
     char *tempvar, *tempvar2;
-    // printf("upar");
     tempvar = term();
-    // printf("expre");
     while (match(PLUS) || match(MINUS))
     {
-        // printf("plus");
         int type;
         if(match(PLUS)) {
             type = PLUS;
@@ -210,28 +268,21 @@ char *expression()
         advance();
         tempvar2 = term();
         if(type == PLUS) {
-            printf("%s += %s\n", tempvar, tempvar2);
+            fprintf(outinter, "%s += %s\n", tempvar, tempvar2);
+            fprintf(outtemp, "ADD %s, %s\n", tempvar, tempvar2);
         }
-        else{
-            printf("    %s -= %s\n", tempvar, tempvar2);
+        else {
+            fprintf(outinter, "%s -= %s\n", tempvar, tempvar2);
+            fprintf(outtemp, "SUB %s, %s\n", tempvar, tempvar2);
         }
-        
         freename(tempvar2);
     }
-    // while( match(PLUS)){
-    //     advance();
-    //     tempvar2 =term();
-    //     printf("   %s += %s\n", tempvar, tempvar2 );
-    //     freename( tempvar2 );
-    // }
-    // printf("niche %s\n", tempvar);
     return tempvar;
 }
 
-char *term()
+char *term(void)
 {
     char *tempvar, *tempvar2;
-    // printf("term hua\n");
     tempvar = factor();
     while (match(TIMES) || match(DIVIDE))
     {
@@ -245,44 +296,47 @@ char *term()
         advance();
         tempvar2 = factor();
         if(type == TIMES){
-            printf("%s *= %s\n", tempvar, tempvar2);
+            fprintf(outinter, "%s *= %s\n", tempvar, tempvar2);
+            fprintf(outtemp, "MOV AL, %s\n", tempvar);
+            fprintf(outtemp, "IMUL %s\n", tempvar2);
+            fprintf(outtemp, "MOV %s, AL\n", tempvar);
         }
         else{
-            printf("%s /= %s\n", tempvar, tempvar2);
+            fprintf(outinter, "%s /= %s\n", tempvar, tempvar2);
+            fprintf(outtemp, "MOV AL, %s\n", tempvar);
+            fprintf(outtemp, "IDIV %s\n", tempvar2);
+            fprintf(outtemp, "MOV %s, AL\n", tempvar);
         }
         freename(tempvar2);
     }
-
     return tempvar;
 }
 
 char *factor()
 {
     char *tempvar;
-    // printf("factor hua\n");
     if (match(NUM_OR_ID))
     {
         /* Print the assignment instruction. The %0.*s conversion is a form of
-	 * %X.Ys, where X is the field width and Y is the maximum number of
-	 * characters that will be printed (even if the string is longer). I'm
-	 * using the %0.*s to print the string because it's not \0 terminated.
-	 * The field has a default width of 0, but it will grow the size needed
-	 * to print the string. The ".*" tells printf() to take the maximum-
-	 * number-of-characters count from the next argument (yyleng).
-	 */
-        // printf("factor 1 hua\n");
+        * %X.Ys, where X is the field width and Y is the maximum number of
+        * characters that will be printed (even if the string is longer). I'm
+        * using the %0.*s to print the string because it's not \0 terminated.
+        * The field has a default width of 0, but it will grow the size needed
+        * to print the string. The ".*" tells printf() to take the maximum-
+        * number-of-characters count from the next argument (yyleng).
+        */
         if (isalpha(idname[0])) {
             if (!present(symbol_list, idname, yyleng)) {
                 fprintf(stderr, "%d: Undeclared identifier %0.*s, inserting anyway\n", yylineno, yyleng, idname);
                 symbol_list = push(symbol_list, idname, yyleng);
             }
         }
-        printf("%s = %0.*s\n", tempvar = newname(), yyleng, yytext);
+        fprintf(outinter, "%s = %0.*s\n", tempvar = newname(), yyleng, yytext);
+        fprintf(outtemp, "MOV %s, %0.*s\n", tempvar, yyleng, yytext);
         advance();
     }
     else if (match(LP))
     {   
-        // printf("factor 2 hua\n");
         advance();
         tempvar = expression();
         if (match(RP))
@@ -290,8 +344,8 @@ char *factor()
         else
             fprintf(stderr, "%d: Mismatched parenthesis\n", yylineno);
     }
-    else{
-        // printf("factor 3 hua\n");
+    else
+    {
         fprintf(stderr, "%d: Number or identifier expected\n", yylineno);
     }
     return tempvar;

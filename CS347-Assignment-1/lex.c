@@ -1,5 +1,5 @@
 #include "lex.h"
-#include "linked-list.c"
+#include "list.c"
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -40,7 +40,6 @@ int lex(void){
          /* Get the next token */
          yytext = current;
          yyleng = 1;
-         // printf("%c\n", *yytext);
          switch( *current ){
             case ';':
                return SEMI;
@@ -62,7 +61,6 @@ int lex(void){
                return GREAT;
             case ':':
                current++;
-               // printf("%c special", *current);
                if(*current != '='){
                   current--;
                   fprintf(stderr, "inserting missing '=' after ':'\n");
@@ -75,14 +73,11 @@ int lex(void){
             case '\t':
             case ' ' :
                break;
-            default:
-               
+            default:               
                if(!isalnum(*current)){
-                  // printf("scanning 1 b\n");
                   fprintf(stderr, "Not alphanumeric <%c>\n", *current);
                }
                else{
-                  // printf("scanning 2 b\n");
                   while(isalnum(*current)){
                      ++current;
                   }
@@ -91,24 +86,13 @@ int lex(void){
                   int returnvals[] = {IF, THEN, WHILE, DO, BEGIN, END};
                   int lengths[] = {2,4,5,2,5,3};
                   int i=0;
-                  // printf("location 1\n");                  
                   for(i=0; i<6; i++){
                      if(strncmp(yytext, tokens[i],yyleng)==0 && yyleng == lengths[i]){
-                        // printf("keyword %d\n", i);
                         return returnvals[i];
                      }
                   }
-                  // idname = (char *) malloc(yyleng+1);
-                  // fprintf();
-                  // char idname[32];
-                  strncpy(idname, yytext, yyleng);
-                  // if (isalpha(idname[0])) {
-                  //    if (!present(symbol_list, idname)) {
-                  //       fprintf(stderr, "%d: Found new variable %s\n", yylineno, idname);
-                  //       symbol_list = push(symbol_list, idname, yyleng);
-                  //    }
-                  // }
-                  // printf("location 3\n"); 
+                  strncpy(idname, yytext, yyleng);   
+                  idname[yyleng] = '\0';               
                   return NUM_OR_ID;
                }
             break;
