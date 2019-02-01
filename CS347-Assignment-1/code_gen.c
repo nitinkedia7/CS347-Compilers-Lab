@@ -36,7 +36,7 @@ void stmt(void)
     if (match(NUM_OR_ID))
     {
         if (isalpha(idname[0])) {
-            if (!present(symbol_list, idname)) {
+            if (!present(symbol_list, idname, yyleng)) {
                 symbol_list = push(symbol_list, idname, yyleng);
             }
         }
@@ -272,8 +272,8 @@ char *factor()
 	 */
         // printf("factor 1 hua\n");
         if (isalpha(idname[0])) {
-            if (!present(symbol_list, idname)) {
-                fprintf(stderr, "%d: Undeclared identifier %s, inserting anyway\n", yylineno, idname);
+            if (!present(symbol_list, idname, yyleng)) {
+                fprintf(stderr, "%d: Undeclared identifier %0.*s, inserting anyway\n", yylineno, yyleng, idname);
                 symbol_list = push(symbol_list, idname, yyleng);
             }
         }

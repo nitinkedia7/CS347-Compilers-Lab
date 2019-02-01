@@ -24,9 +24,9 @@ symbol *push(symbol *symbol_list, char idname[32], int len) {
     return temp;
 }
 
-bool present(symbol *symbol_list, char idname[32]) {
+bool present(symbol *symbol_list, char idname[32], int len) {
     while (symbol_list != NULL) {
-        if (strncmp(symbol_list->idname, idname, symbol_list->len) == 0)
+        if (strncmp(symbol_list->idname, idname, len) == 0)
             return true;
         symbol_list = symbol_list->ptr;
     }   
