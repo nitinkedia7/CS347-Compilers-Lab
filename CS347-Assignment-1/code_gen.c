@@ -35,6 +35,15 @@ void stmt(void)
     char *tempvar, *tempvar2;
     if (match(NUM_OR_ID))
     {
+        if (isalpha(idname[0])) {
+            if (!present(symbol_list, idname)) {
+                symbol_list = push(symbol_list, idname, yyleng);
+            }
+        }
+        else {
+            fprintf(stderr, "%d: Cannot assign value to integer %s\n", yylineno, idname);
+            exit(0);
+        }
         advance();
         // printf("assign above\n");
         if (match(ASSIGN))
@@ -48,7 +57,7 @@ void stmt(void)
                 fprintf( stderr, "%d: Inserting missing semicolon\n", yylineno );
             }
             advance();
-            printf("%s := %s\n", var, tempvar);
+            printf("%s = %s\n", var, tempvar);
             freename(tempvar);
         }
     }
@@ -262,6 +271,12 @@ char *factor()
 	 * number-of-characters count from the next argument (yyleng).
 	 */
         // printf("factor 1 hua\n");
+        if (isalpha(idname[0])) {
+            if (!present(symbol_list, idname)) {
+                fprintf(stderr, "%d: Undeclared identifier %s, inserting anyway\n", yylineno, idname);
+                symbol_list = push(symbol_list, idname, yyleng);
+            }
+        }
         printf("%s = %0.*s\n", tempvar = newname(), yyleng, yytext);
         advance();
     }

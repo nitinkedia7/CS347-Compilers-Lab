@@ -22,7 +22,8 @@
 extern char *yytext;		/* in lex.c			*/
 extern int yyleng;
 extern int yylineno;
-extern char *idname;
+extern char idname[32];
+// extern symbol* symbol_list;
 
 int lex(void);
 int match(int);

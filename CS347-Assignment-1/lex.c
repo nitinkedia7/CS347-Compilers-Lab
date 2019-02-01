@@ -1,4 +1,5 @@
 #include "lex.h"
+#include "linked-list.c"
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -8,7 +9,8 @@ char* yytext = ""; /* Lexeme (not '\0'
                       terminated)              */
 int yyleng   = 0;  /* Lexeme length.           */
 int yylineno = 0;  /* Input line number        */
-char* idname = "";
+char idname[32];
+symbol* symbol_list = NULL;
 
 int lex(void){
    static char input_buffer[1024];
@@ -96,9 +98,16 @@ int lex(void){
                         return returnvals[i];
                      }
                   }
-                  idname = (char *) malloc(yyleng+1);
+                  // idname = (char *) malloc(yyleng+1);
                   // fprintf();
+                  // char idname[32];
                   strncpy(idname, yytext, yyleng);
+                  // if (isalpha(idname[0])) {
+                  //    if (!present(symbol_list, idname)) {
+                  //       fprintf(stderr, "%d: Found new variable %s\n", yylineno, idname);
+                  //       symbol_list = push(symbol_list, idname, yyleng);
+                  //    }
+                  // }
                   // printf("location 3\n"); 
                   return NUM_OR_ID;
                }
