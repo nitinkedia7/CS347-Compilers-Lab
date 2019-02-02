@@ -1,0 +1,16 @@
+a := 1;
+c := 3;
+b := 1;
+while c > 0 do
+begin
+    if b = 1 then
+    begin
+        a := a * 2;
+        b := 0;
+    end
+    if b = 0 then
+    begin
+        a := a * 3;
+        b := 1;
+    end
+end

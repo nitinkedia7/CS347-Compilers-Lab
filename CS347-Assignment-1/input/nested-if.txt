@@ -1,0 +1,6 @@
+a := 1;
+if a > 0 then
+begin
+    if a > 1 then
+        a := a * 2;
+end
