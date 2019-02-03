@@ -4,7 +4,7 @@
 #define TIMES		3	/* * 				*/
 #define LP		    4	/* (				*/
 #define RP		    5	/* )				*/
-#define NUM_OR_ID	6	/* Decimal Number or Identifier */
+#define NUM     	6	/* Decimal Number or Identifier */
 #define MINUS       7
 #define DIVIDE      8
 #define LESS        9

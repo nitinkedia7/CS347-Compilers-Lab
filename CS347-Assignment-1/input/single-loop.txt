@@ -1,4 +1,7 @@
 a := 1;
 c := 3;
 while c > 0 do
+begin
     a := a * 2;
+    c := c - 1;
+end

@@ -3,3 +3,4 @@
 intermediate.txt
 *.asm
 **/.vscode/*
+**/output/

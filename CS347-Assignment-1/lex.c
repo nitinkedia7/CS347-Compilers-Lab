@@ -10,6 +10,7 @@ char* yytext = ""; /* Lexeme (not '\0'
 int yyleng   = 0;  /* Lexeme length.           */
 int yylineno = 0;  /* Input line number        */
 char idname[32];
+int spaces  = 0;
 symbol* symbol_list = NULL;
 
 int lex(void){
@@ -36,6 +37,7 @@ int lex(void){
          while(isspace(*current))
             ++current;
       }
+      spaces=0;
       for(; *current; ++current){
          /* Get the next token */
          yytext = current;
@@ -70,8 +72,8 @@ int lex(void){
             case '=':
                return EQUAL;
             case '\n':
-            case '\t':
-            case ' ' :
+            case '\t': 
+            case ' ' : spaces++;
                break;
             default:               
                if(!isalnum(*current)){
@@ -93,7 +95,17 @@ int lex(void){
                   }
                   strncpy(idname, yytext, yyleng);   
                   idname[yyleng] = '\0';               
-                  return NUM_OR_ID;
+                  if(isalpha(idname[0])){
+                     return ID;
+                  }
+                  // char* temp = yytext;
+                  for(int i=0;i<yyleng;i++){
+                     if(!isdigit(idname[i])){
+                        fprintf(stderr, "%d: Fatal error not a number\n", yylineno);
+                        exit(1);
+                     }
+                  }         
+                  return NUM;
                }
             break;
          }
@@ -103,6 +115,7 @@ int lex(void){
 
 
 static int Lookahead = -1; /* Lookahead token  */
+static int previousLookahead = -1;
 
 int match(int token){
    /* Return true if "token" matches the
@@ -117,6 +130,12 @@ int match(int token){
 void advance(void){
 /* Advance the lookahead to the next
    input symbol.                               */
+   previousLookahead = Lookahead;
+   Lookahead = lex();
+}
 
-    Lookahead = lex();
+void loopback(void){
+   if(previousLookahead == -1) return;
+   Lookahead = previousLookahead;
+   yytext -= (yyleng+spaces);
 }

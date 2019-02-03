@@ -13,4 +13,5 @@ begin
         a := a * 3;
         b := 1;
     end
+    c := c-1;
 end

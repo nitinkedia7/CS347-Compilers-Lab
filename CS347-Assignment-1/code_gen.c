@@ -7,7 +7,6 @@
 #define SYNCH	 SEMI
 
 int	legal_lookahead(int first_arg, ...)
-// int first_arg;
 {
     /* Simple error detection and recovery. Arguments are a 0-terminated list of
      * those tokens that can legitimately come next in the input. If the list is
@@ -94,8 +93,8 @@ void statements(void){
     while(!match(EOI)){
         stmt();
     }
-    fprintf(outtemp, "END\n");
-    // rewind(outtemp);
+
+    fprintf(outtemp, "RET\nEND\n");
     fprintf(outasm, "org 100h\n");
     fprintf(outasm, ".DATA\n");
     symbol* temp_symbol = symbol_list;
@@ -122,21 +121,12 @@ void stmt(void)
             | while expr do stmt
             | begin opt_stmts end */
 
-    if( !legal_lookahead( NUM_OR_ID, IF, WHILE, BEGIN, 0 ) ) {
-        terminate();
-    }
-
     char *tempvar, *tempvar2;
-    if (match(NUM_OR_ID))
+    if (match(ID))
     {
-        if (isalpha(idname[0])) {
-            if (!present(symbol_list, idname, yyleng)) {
-                symbol_list = push(symbol_list, idname, yyleng);
-            }
+        if (!present(symbol_list, idname, yyleng)) {
+            symbol_list = push(symbol_list, idname, yyleng);
         }
-        else {
-            fprintf(stderr, "%d: Cannot assign value to integer %s\n", yylineno, idname);
-        }  
         advance();
         if (match(ASSIGN))
         {
@@ -148,14 +138,23 @@ void stmt(void)
             if(match(SEMI)){
                 advance();
             }
-            else fprintf( stderr, "%d: Inserting missing semicolon\n", yylineno );
+            else {
+                fprintf( stderr, "%d: missing semicolon\n", yylineno );
+                terminate();
+            }
             fprintf(outinter, "%s = %s\n", var, tempvar);
             fprintf(outtemp, "MOV %s, %s\n", var, tempvar);
             freename(tempvar);
         }
         else {
-            fprintf(stderr, "%d: Expected assignent operator ':='\n", yylineno);
-            terminate();
+            loopback();
+            tempvar = expr(0);
+            if(!match(SEMI)){
+                fprintf( stderr, "%d: Missing semicolon\n", yylineno );
+                terminate();
+            }
+            advance();
+            freename(tempvar);
         }
     }
     else if (match(IF))
@@ -209,6 +208,15 @@ void stmt(void)
     {
         advance();
         stmt_list();
+    }
+    else {
+        tempvar = expr(0);
+        if(!match(SEMI)){
+            fprintf( stderr, "%d: Missing semicolon\n", yylineno );
+            terminate();
+        }
+        advance();
+        freename(tempvar);    
     }
     return;
 }
@@ -319,6 +327,10 @@ char *expr(int flag)
             fprintf(outtemp, "CMP %s, 0\n", tempvar);
             fprintf(outtemp, "JE line_%d\n", if_label);
         }
+        else if (match(ASSIGN)){
+            fprintf( stderr, "%d: Fatal error: unknown :=\n", yylineno );
+            terminate();
+        }
     }
     return tempvar;
 }
@@ -389,7 +401,7 @@ char *term(void)
 char *factor()
 {
     char *tempvar;
-    if (match(NUM_OR_ID))
+    if (match(ID)||match(NUM))
     {
         /* Print the assignment instruction. The %0.*s conversion is a form of
         * %X.Ys, where X is the field width and Y is the maximum number of
@@ -399,14 +411,14 @@ char *factor()
         * to print the string. The ".*" tells printf() to take the maximum-
         * number-of-characters count from the next argument (yyleng).
         */
-        if (isalpha(idname[0])) {
+        if (match(ID)) {
             if (!present(symbol_list, idname, yyleng)) {
-                fprintf(stderr, "%d: Undeclared identifier %0.*s, inserting anyway\n", yylineno, yyleng, idname);
-                symbol_list = push(symbol_list, idname, yyleng);
+                fprintf(stderr, "%d: Undeclared identifier %1.*s\n", yylineno, yyleng, idname);
+                terminate();
             }
         }
-        fprintf(outinter, "%s = %0.*s\n", tempvar = newname(), yyleng, yytext);
-        fprintf(outtemp, "MOV %s, %0.*s\n", tempvar, yyleng, yytext);
+        fprintf(outinter, "%s = %1.*s\n", tempvar = newname(), yyleng, yytext);
+        fprintf(outtemp, "MOV %s, %1.*s\n", tempvar, yyleng, yytext);
         advance();
     }
     else if (match(LP))
