@@ -140,5 +140,6 @@ void advance(void){
 void loopback(void){
    if(previousLookahead == -1) return;
    Lookahead = previousLookahead;
-   yytext -= (yyleng+spaces);
+   yytext -= (idlength+spaces);
+   yyleng = idlength;
 }
