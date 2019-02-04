@@ -1,0 +1,11 @@
+a := 1;
+b := 1;
+c := 5;
+d := 0;
+while c > 0 do
+	begin
+		d:=b+a;
+		b:=d;
+		a:=b;
+		c:=c-1;
+	end	

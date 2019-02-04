@@ -99,7 +99,7 @@ void statements(void){
     fprintf(outasm, ".DATA\n");
     symbol* temp_symbol = symbol_list;
     while(temp_symbol!=NULL){
-        fprintf(outasm, "%s DB ?\n", temp_symbol->idname);
+        fprintf(outasm, "_%s DB ?\n", temp_symbol->idname);
         temp_symbol = temp_symbol->ptr;
     }
     fprintf(outasm, ".CODE\n");
@@ -131,7 +131,7 @@ void stmt(void)
         if (match(ASSIGN))
         {
             char var[32];
-            strncpy(var, idname, yyleng);
+            strncpy(var, idname, idlength+1);
             advance();
             tempvar = expr(0);
 
@@ -142,8 +142,8 @@ void stmt(void)
                 fprintf( stderr, "%d: missing semicolon\n", yylineno );
                 terminate();
             }
-            fprintf(outinter, "%s = %s\n", var, tempvar);
-            fprintf(outtemp, "MOV %s, %s\n", var, tempvar);
+            fprintf(outinter, "_%s = %s\n", var, tempvar);
+            fprintf(outtemp, "MOV _%s, %s\n", var, tempvar);
             freename(tempvar);
         }
         else {
@@ -255,7 +255,7 @@ char *expr(int flag)
             fprintf(outtemp, "CMP %s, %s\n", tempvar,tempvar2);
             fprintf(outtemp, "JNG line_%d\n", if_label);
         }
-        else if (flag == 0){
+        else if (flag == 0){  
             fprintf(outinter, "%s > %s\n", tempvar, tempvar2);
             fprintf(outtemp, "CMP %s, %s\n", tempvar, tempvar2);
             fprintf(outtemp, "MOV %s, 0\n", tempvar);            
@@ -390,6 +390,7 @@ char *term(void)
         else{
             fprintf(outinter, "%s /= %s\n", tempvar, tempvar2);
             fprintf(outtemp, "MOV AL, %s\n", tempvar);
+            fprintf(outtemp, "MOV AH, 0\n");
             fprintf(outtemp, "IDIV %s\n", tempvar2);
             fprintf(outtemp, "MOV %s, AL\n", tempvar);
         }
@@ -415,11 +416,16 @@ char *factor()
             if (!present(symbol_list, idname, yyleng)) {
                 fprintf(stderr, "%d: Undeclared identifier %1.*s\n", yylineno, yyleng, idname);
                 terminate();
-            }
+            }        
+            fprintf(outinter, "%s = _%1.*s\n", tempvar = newname(), yyleng, yytext);
+            fprintf(outtemp, "MOV %s, _%1.*s\n", tempvar, yyleng, yytext);
+            advance();    
         }
-        fprintf(outinter, "%s = %1.*s\n", tempvar = newname(), yyleng, yytext);
-        fprintf(outtemp, "MOV %s, %1.*s\n", tempvar, yyleng, yytext);
-        advance();
+        else { 
+            fprintf(outinter, "%s = %1.*s\n", tempvar = newname(), yyleng, yytext);
+            fprintf(outtemp, "MOV %s, %1.*s\n", tempvar, yyleng, yytext);
+            advance();
+        }
     }
     else if (match(LP))
     {   

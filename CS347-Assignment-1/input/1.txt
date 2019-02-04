@@ -1,0 +1,13 @@
+begin
+	begin
+		if a=2 then
+			while c=4 do
+				begin
+					if a=6 then
+						b:=6;
+				end
+	end
+
+	if a=5 then
+	b:=6;
+end

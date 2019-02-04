@@ -1,0 +1,7 @@
+a := 3;
+if a > 0 then
+	b := 6;
+	c := 4;
+	while c < 7 do
+		if b = 6 then
+			c := c + 1;

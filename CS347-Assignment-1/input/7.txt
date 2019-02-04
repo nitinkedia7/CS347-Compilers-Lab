@@ -1,0 +1,9 @@
+a;
+b :=1;
+c :=3;
+while c > 0
+    do
+    begin
+        b := c*b;
+        c := c - 1;
+        end

@@ -1,0 +1,17 @@
+nitin := 1;
+mains := 3;
+mishra := 1;
+while mains > 0 do
+begin
+    if mishra = 1 then
+    begin
+        nitin := nitin * 2;
+        mishra := 0;
+    end
+    if mishra = 0 then
+    begin
+        nitin := nitin * 3;
+        mishra := 1;
+    end
+    mains := mains-1;
+end

@@ -10,6 +10,7 @@ char* yytext = ""; /* Lexeme (not '\0'
 int yyleng   = 0;  /* Lexeme length.           */
 int yylineno = 0;  /* Input line number        */
 char idname[32];
+int idlength = 0;
 int spaces  = 0;
 symbol* symbol_list = NULL;
 
@@ -65,7 +66,8 @@ int lex(void){
                current++;
                if(*current != '='){
                   current--;
-                  fprintf(stderr, "inserting missing '=' after ':'\n");
+                  fprintf(stderr, "%d: Missing '=' after ':'\n", yylineno);
+                  exit(1);
                }
                yyleng++;
                return ASSIGN;
@@ -94,7 +96,8 @@ int lex(void){
                      }
                   }
                   strncpy(idname, yytext, yyleng);   
-                  idname[yyleng] = '\0';               
+                  idname[yyleng] = '\0';
+                  idlength = yyleng;               
                   if(isalpha(idname[0])){
                      return ID;
                   }

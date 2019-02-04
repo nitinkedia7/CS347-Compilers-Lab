@@ -1,0 +1,4 @@
+a := 3 ;
+b := 1 ;
+while a > 0 do begin b := b+a; a := a-1; end
+c := 2 ;
