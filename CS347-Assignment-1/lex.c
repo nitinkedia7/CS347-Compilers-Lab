@@ -45,22 +45,31 @@ int lex(void){
          yyleng = 1;
          switch( *current ){
             case ';':
+               // printf("SEMI\n");
                return SEMI;
             case '+':
+            // printf("PLUS\n");
                return PLUS;
             case '*':
+            // printf("TIMES\n");
                return TIMES;
             case '(':
+            // printf("LP\n");
                return LP;
             case ')':
+            // printf("RP\n");
                return RP;
             case '-':
+            // printf("MINUS\n");
                return MINUS;
             case '/':
+            // printf("DIVIDE\n");
                return DIVIDE;
             case '<':
+            // printf("LESS\n");
                return LESS;
             case '>':
+            // printf("GREAT\n");
                return GREAT;
             case ':':
                current++;
@@ -69,9 +78,11 @@ int lex(void){
                   fprintf(stderr, "%d: Missing '=' after ':'\n", yylineno);
                   exit(1);
                }
+               // printf("ASSIGN\n");
                yyleng++;
                return ASSIGN;
             case '=':
+            // printf("EQUAL\n");
                return EQUAL;
             case '\n':
             case '\t': 
@@ -92,12 +103,14 @@ int lex(void){
                   int i=0;
                   for(i=0; i<6; i++){
                      if(strncmp(yytext, tokens[i],yyleng)==0 && yyleng == lengths[i]){
+                        // printf("%s\n", tokens[i]);
                         return returnvals[i];
                      }
                   }
                   strncpy(idname, yytext, yyleng);   
                   idname[yyleng] = '\0';
-                  idlength = yyleng;               
+                  idlength = yyleng;       
+                  // printf("%s\n", idname);        
                   if(isalpha(idname[0])){
                      return ID;
                   }
@@ -135,6 +148,7 @@ void advance(void){
    input symbol.                               */
    previousLookahead = Lookahead;
    Lookahead = lex();
+
 }
 
 void loopback(void){

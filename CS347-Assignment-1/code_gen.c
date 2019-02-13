@@ -61,6 +61,13 @@ exit:
     return rval;
 }
 
+void print_tabs(int t){
+    int i=0;
+    for(i=0;i<t;i++){
+        printf("\t");
+    }
+}
+
 void terminate() {
     remove("./output/assembly.temp");
     remove("./output/assembly.txt");
@@ -82,18 +89,27 @@ FILE *outasm, *outinter, *outtemp;
 int if_label = 0;
 int while_label = 0;
 int comp_label = 0;
+int tabs=0;
 
 void statements(void){
     /* statements -> stmt statements | stmt */
 
     outtemp = fopen("./output/assembly.temp", "w+");
     outinter = fopen("./output/intermediate.txt", "w");
-    outasm = fopen("./output/assembly.txt", "w");
+    outasm = fopen("./output/assembly.txt", "w");\
     
+    int tab2=0;
     while(!match(EOI)){
+        print_tabs(tabs);
+        printf("statements()\n");
+        tabs++;
+        tab2++;
         stmt();
+        // tab2++;
+        // tabs++;
+        // tabs--;
     }
-
+    tabs -= tab2;
     fprintf(outtemp, "RET\nEND\n");
     fprintf(outasm, "org 100h\n");
     fprintf(outasm, ".DATA\n");
@@ -120,7 +136,10 @@ void stmt(void)
             | if expr then stmt
             | while expr do stmt
             | begin opt_stmts end */
-
+    
+    print_tabs(tabs);
+    printf("stmt()\n");
+    tabs++;
     char *tempvar, *tempvar2;
     if (match(ID))
     {
@@ -128,14 +147,19 @@ void stmt(void)
             symbol_list = push(symbol_list, idname, yyleng);
         }
         advance();
+        print_tabs(tabs);
+        printf("< ID %1.*s > \n", idlength, idname);
         if (match(ASSIGN))
         {
+            print_tabs(tabs);
+            printf("ASSIGN\n");
             char var[32];
             strncpy(var, idname, idlength+1);
             advance();
             tempvar = expr(0);
-
             if(match(SEMI)){
+                print_tabs(tabs);
+                printf("SEMI\n");
                 advance();
             }
             else {
@@ -160,12 +184,16 @@ void stmt(void)
     else if (match(IF))
     {
         advance();
+        print_tabs(tabs);
+        printf("IF\n");
         tempvar = expr(1);
         freename(tempvar);
         int curr_label = if_label;
         if_label++;
         if (match(THEN))
         {
+            print_tabs(tabs);
+            printf("THEN\n");
             advance();
             stmt();
             fprintf(outinter, "}\n");
@@ -180,6 +208,8 @@ void stmt(void)
     }
     else if (match(WHILE))
     {
+        print_tabs(tabs);
+        printf("WHILE\n");
         advance();
         int curr_label = while_label;
         int cond_label = if_label;
@@ -192,6 +222,8 @@ void stmt(void)
         
         if (match(DO))
         {
+            print_tabs(tabs);
+            printf("DO\n");
             advance();
             stmt();
             fprintf(outtemp, "JMP while_%d\n", curr_label);
@@ -206,6 +238,8 @@ void stmt(void)
     }
     else if (match(BEGIN))
     {
+        print_tabs(tabs);
+        printf("BEGIN\n");
         advance();
         stmt_list();
     }
@@ -218,16 +252,31 @@ void stmt(void)
         advance();
         freename(tempvar);    
     }
+    tabs--;
     return;
 }
 
 void stmt_list(void)
 {
     /* stmt_list -> stmt stmt_list  | END */
+    // tabs++;
+    int tabs2 = 0;
+    print_tabs(tabs);
+    printf("stmt_list()\n");
     while (!match(END))
     {
+        tabs2++;
+        tabs++;
         stmt();
+        // tabs--;
+        print_tabs(tabs);
+        printf("stmt_list()\n");
     }
+    tabs++;
+    print_tabs(tabs);
+    printf("END\n");
+    tabs--;
+    tabs -= tabs2;
     advance();
     return;
 }
@@ -238,11 +287,15 @@ char *expr(int flag)
             | expression LESS expression
             | expression EQUAL expression
             | expression */
-
+    print_tabs(tabs);
+    printf("expr()\n");
+    tabs++;
     char *tempvar, *tempvar2;
     tempvar = expression();
     if (match(GREAT))
     {
+        print_tabs(tabs);
+        printf("GREAT\n");
         advance();
         tempvar2 = expression();
         if (flag == 1){  
@@ -268,6 +321,8 @@ char *expr(int flag)
     }
     else if (match(LESS))
     {
+        print_tabs(tabs);
+        printf("LESS\n");
         advance();
         tempvar2 = expression();
         if (flag == 1)  {
@@ -293,6 +348,8 @@ char *expr(int flag)
     }
     else if (match(EQUAL))
     {
+        print_tabs(tabs);
+        printf("EQUAL\n");
         advance();
         tempvar2 = expression();
         if (flag == 1)  {
@@ -332,6 +389,7 @@ char *expr(int flag)
             terminate();
         }
     }
+    tabs--;
     return tempvar;
 }
 
@@ -339,16 +397,23 @@ char *expression(void)
 {
     /* expression -> term expression'
      * expression' -> PLUS term expression' |  epsilon */
-
+    print_tabs(tabs);
+    printf("expression()\n");
+    tabs++;
     char *tempvar, *tempvar2;
     tempvar = term();
+    int tabs2=0;
     while (match(PLUS) || match(MINUS))
     {
         int type;
         if(match(PLUS)) {
+            print_tabs(tabs);
+            printf("PLUS\n");
             type = PLUS;
         }
         else {
+            print_tabs(tabs);
+            printf("MINUS\n");
             type = MINUS;
         }
         advance();
@@ -361,22 +426,34 @@ char *expression(void)
             fprintf(outinter, "%s -= %s\n", tempvar, tempvar2);
             fprintf(outtemp, "SUB %s, %s\n", tempvar, tempvar2);
         }
+        tabs++, tabs2++;
         freename(tempvar2);
     }
+    tabs-=tabs2;
+    tabs--;
     return tempvar;
 }
 
 char *term(void)
 {
+    print_tabs(tabs);
+    printf("term()\n");
+    tabs++;
     char *tempvar, *tempvar2;
     tempvar = factor();
+    int tabs2=0;
     while (match(TIMES) || match(DIVIDE))
     {
+        
         int type;
         if(match(TIMES)) {
+            print_tabs(tabs);
+            printf("TIMES\n");
             type = TIMES;
         }
         else {
+            print_tabs(tabs);
+            printf("DIVIDE\n");
             type = DIVIDE;
         }
         advance();
@@ -394,14 +471,20 @@ char *term(void)
             fprintf(outtemp, "IDIV %s\n", tempvar2);
             fprintf(outtemp, "MOV %s, AL\n", tempvar);
         }
+        tabs++, tabs2++;
         freename(tempvar2);
     }
+    tabs-=tabs2;
+    tabs--;
     return tempvar;
 }
 
 char *factor()
 {
     char *tempvar;
+    print_tabs(tabs);
+    printf("factor()\n");
+    tabs++;
     if (match(ID)||match(NUM))
     {
         /* Print the assignment instruction. The %0.*s conversion is a form of
@@ -416,12 +499,16 @@ char *factor()
             if (!present(symbol_list, idname, yyleng)) {
                 fprintf(stderr, "%d: Undeclared identifier %1.*s\n", yylineno, yyleng, idname);
                 terminate();
-            }        
+            }   
+            print_tabs(tabs);
+            printf(" < ID %1.*s > \n", yyleng, yytext);    
             fprintf(outinter, "%s = _%1.*s\n", tempvar = newname(), yyleng, yytext);
             fprintf(outtemp, "MOV %s, _%1.*s\n", tempvar, yyleng, yytext);
             advance();    
         }
         else { 
+            print_tabs(tabs);
+            printf(" < NUM %1.*s > \n", yyleng, yytext);
             fprintf(outinter, "%s = %1.*s\n", tempvar = newname(), yyleng, yytext);
             fprintf(outtemp, "MOV %s, %1.*s\n", tempvar, yyleng, yytext);
             advance();
@@ -429,10 +516,15 @@ char *factor()
     }
     else if (match(LP))
     {   
+        print_tabs(tabs);
+        printf("LP\n");
         advance();
         tempvar = expression();
-        if (match(RP))
+        if (match(RP)){
+            print_tabs(tabs);
+            printf("RP\n");
             advance();
+        }
         else
             fprintf(stderr, "%d: Mismatched parenthesis\n", yylineno);
     }
@@ -441,5 +533,6 @@ char *factor()
         fprintf(stderr, "%d: Number or identifier expected\n", yylineno);
         terminate();
     }
+    tabs--;
     return tempvar;
 }
