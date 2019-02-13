@@ -1,0 +1,66 @@
+statements()
+	stmt()
+		< ID a > 
+		ASSIGN
+		expr()
+			expression()
+				term()
+					factor()
+						 < NUM 6 > 
+		SEMI
+	statements()
+		stmt()
+			< ID b > 
+			ASSIGN
+			expr()
+				expression()
+					term()
+						factor()
+							 < NUM 2 > 
+			SEMI
+		statements()
+			stmt()
+				WHILE
+				expr()
+					expression()
+						term()
+							factor()
+								 < ID a > 
+					GREAT
+					expression()
+						term()
+							factor()
+								 < NUM 0 > 
+				DO
+				stmt()
+					IF
+					expr()
+						expression()
+							term()
+								factor()
+									 < ID b > 
+						GREAT
+						expression()
+							term()
+								factor()
+									 < NUM 0 > 
+					THEN
+					stmt()
+						< ID c > 
+						ASSIGN
+						expr()
+							expression()
+								term()
+									factor()
+										 < NUM 5 > 
+						SEMI
+			statements()
+				stmt()
+					< ID d > 
+					ASSIGN
+					expr()
+						expression()
+							term()
+								factor()
+									 < NUM 3 > 
+					SEMI
