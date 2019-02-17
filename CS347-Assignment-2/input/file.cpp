@@ -84,6 +84,20 @@ class Dss
 }; 
 */
 
+//Base class 
+class Parent 
+{ 
+    public: 
+      int id_p; 
+}; 
+   
+// Sub class inheriting from Base Class(Parent) 
+class Child : public Parent 
+{ 
+    public: 
+      int id_c; 
+}; 
+
 int main() { 
   
     // Declare an object of class geeks 
