@@ -1,9 +1,3 @@
-/************************
-ROOPANSH BANSAL
-150101053
-CS210
-************************/
-
 #include <bits/stdc++.h>
 
 using namespace std;
