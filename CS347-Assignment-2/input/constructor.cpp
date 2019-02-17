@@ -1,0 +1,1 @@
+class A{    A();    }class AA{    ~AA(){    }    AA();   }A(int ft, float in) : feet(ft), inches(in){}A::A(){};void operator += ( Distance ){}Counter operator++ () { return Counter(++count); } Counter operator ++ (int) { return Counter(count++); } A() : AA() {}operator char*() {}Distance Distance::operator + (Distance d2) const {}

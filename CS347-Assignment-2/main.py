@@ -11,6 +11,7 @@ NUMOFCONSTRUCTOR = 0
 NUMOFOPERATOROVERL = 0
 NUMOFOBJECTS = 0
 
+
 def removeComment(text):
     def replacer(match):
         s = match.group(0)
@@ -22,81 +23,102 @@ def removeComment(text):
         r'"(\\.|[^\\"])*"|//.*?$|/\*.*?\*/',
         re.DOTALL | re.MULTILINE
     )
-    ttt = re.sub(pattern, replacer, text)
-    # print(type(ttt))  
-    return ttt
+    noCommentFile = re.sub(pattern, replacer, text)
+    return noCommentFile
 
-def classIdentfication(file):
+# def remove_alias(text):
+#   pattern = r'(#define .*?)[\n$]|(typedef [^\;]*?);'
+#   defines = re.findall(pattern, text)
+#   no_alias_file = ''
+#   for iter in defines:
+#       x = iter.split(' ')
+#       repl = ' '.join(x[2:])
+#       repl = '\b'+repl+'\b'
+#       repl = repl('\,', '\,', x[1])
+#       no_alias_file = re.sub(x[1], repl, text)
+#   return no_alias_file
+
+
+def classDefinition(file):
     global NUMOFCLASSES
     lines = file.split("\n")
     for line in lines:
         line += '\n'
-        pattern = r'class\s+([A-Za-z_]\w*)\s*[\n\{]'
-        classNames=re.findall(pattern,line)
+        flag1 = False
+        flag2 = False
+        # pattern = r'class\s+([A-Za-z_]\w*)(?:\s*\:\s*(public|private|protected)?\s+[A-Za-z_]\w*)?[\s]*[\n\{]'
+        pattern1 = r'class\s+([A-Za-z_]\w*)[\s]*[\n\{]'
+        classNames = re.findall(pattern1, line)
+        pattern2 = r'class\s+([A-Za-z_]\w*)\s*\:\s*(public|private|protected)?\s+[A-Za-z_]\w*\s*[\n\{]'
+        inheritedClassNames = re.findall(pattern2, line)
         classNames = list(filter(None, classNames))
-        if len(classNames)>0:
-            NUMOFCLASSES += 1
+        if len(classNames) > 0:
+            flag1 = True
+        if len(inheritedClassNames) > 0:
+            flag2 = True
+        if (flag1 or flag2):
+            NUMOFCLASSES+=1
         for itr in classNames:
             if itr not in CLASSNAME:
-               CLASSNAME.append(itr)
+                CLASSNAME.append(itr)
+
 
 def inheritedClass(file):
-    lines=file.split("\n")
+    lines = file.split("\n")
     global NUMOFINHERITED
     global NUMOFCLASSES
-    # print(NUMOFCLASSES, NUMOFINHERITED)
     for line in lines:
         line += '\n'
         pattern = r'class\s+([A-Za-z_]\w*)\s*\:\s*(public|private|protected)?\s+[A-Za-z_]\w*\s*[\n\{]'
-        inheritedClassNames=re.findall(pattern,line)
+        inheritedClassNames = re.findall(pattern, line)
         # print(inheritedClassNames)
         if len(inheritedClassNames) > 0:
             NUMOFINHERITED = NUMOFINHERITED + 1
-            NUMOFCLASSES = NUMOFCLASSES + 1
+            # NUMOFCLASSES = NUMOFCLASSES + 1
         for itr in inheritedClassNames:
             if itr not in INHERITEDCLASSNAME:
-               INHERITEDCLASSNAME.append(itr)
-               CLASSNAME.append(itr[0])
+                INHERITEDCLASSNAME.append(itr)
+                CLASSNAME.append(itr[0])
     # print(NUMOFCLASSES, NUMOFINHERITED)
 
-def constructorFun(file):
+
+def constructorDefinition(file):
     global NUMOFCONSTRUCTOR
-    lines=file.split("\n")
+    lines = file.split("\n")
     for line in lines:
+        # line=" "+line
         line += '\n'
-        pattern = r'[^~]\b([A-Za-z_][A-Za-z\:_0-9]*)\s*\(([^)]*?)\)\s*[\n\{\:]'
-        l1 = re.findall(pattern, line)            
+        pattern = r'(?:[^~]|^)\b([A-Za-z_][A-Za-z\:_0-9]*)\s*\(([^)]*?)\)\s*[\n\{\:]'
+        # pattern = r'\b([^\~][A-Za-z\:_0-9]*)\s*\(([^)]*?)\)\s*[\n\{\:]'
+        l1 = re.findall(pattern, line)
         poss = False
         for declaration in l1:
             names = declaration[0].split('::')
             lenth = len(names)
             if names[lenth-1] in CLASSNAME and names[lenth-1] == names[0]:
                 # print(names)
+                # print(declaration)
                 poss = True
         if poss:
             NUMOFCONSTRUCTOR += 1
-        
-def objectFun(file):
+
+
+def objectDeclaration(file):
     global NUMOFOBJECTS
-    lines=file.split("\n")
+    lines = file.split("\n")
     for line in lines:
         line += '\n'
-        pattern=r'([A-Za-z_]\w*)\s*([\s\*]*[A-Za-z_\, ][A-Za-z0-9_\, \(\)]*)[^\n\{]*?;'
-        classObjectList=re.findall(pattern, line)
-        # if classObjectList:
-        #     print(classObjectList)
-        poss = False 
-        # if classObjectList is None:
-        #     continue
+        # pattern = r'([A-Za-z_]\w*)[\s|\*](\,?[\s|\*]*[A-Za-z_]\w*.*?[;\,])+'
+        pattern = r'([A-Za-z_]\w*)\s*([\s\*]*[A-Za-z_\,\s][A-Za-z0-9_\,\[\]\s\(\)]*)[^\n\{]*?;'
+        classObjectList = re.findall(pattern, line)
+        # print(classObjectList)
+        poss = False
         for itr in classObjectList:
             if itr[0] in CLASSNAME:
-                # print (itr)
                 OBJECTLIST.append(itr[1])
+                # print(itr)
                 poss = True
-            # elif itr[2] in CLASSNAME:
-            #     OBJECTLIST.append(itr[3])
-            #     poss = True
-        if poss :
+        if poss:
             NUMOFOBJECTS += 1
 
 
@@ -105,27 +127,30 @@ def overloadedFunction(file):
     lines = file.split("\n")
     for line in lines:
         line += '\n'
-        pattern = r'operator\s*([\+\-\*\/]+)[^\{\;]*?[\n\{]'
+        pattern = r'operator\b([\+\-\/\<\>\=\:\[\]\s])*[^\{\;]*?[\n\{]'
+        # pattern = r'operator\b[^\{\;]*?[\n\{]'
         l1 = re.findall(pattern, line)
         if len(l1) > 0:
-            NUMOFOPERATOROVERL += len(l1)
+            NUMOFOPERATOROVERL += 1
 
-with open("input/input2.cpp", "r") as file:
+
+file_name = input("Enter file name : ")
+file_name = "input/"+file_name
+with open(file_name, "r") as file:
     noCommentFile = removeComment(file.read())
-    print("Assignment-2 Report : ")
-    classIdentfication(noCommentFile)
+    classDefinition(noCommentFile)
     inheritedClass(noCommentFile)
 
-    print("Classes              : ",NUMOFCLASSES)      # done
-    print("Inherited classes    : ",NUMOFINHERITED)    # done
+    print("Classes              : ", NUMOFCLASSES)
+    print("Inherited classes    : ", NUMOFINHERITED)
     # print (CLASSNAME)
 
-    objectFun(noCommentFile)
-    print("Objects Declaration  : ",NUMOFOBJECTS)      # done
-    print (OBJECTLIST)
+    objectDeclaration(noCommentFile)
+    print("Objects Declaration  : ", NUMOFOBJECTS)
+    # print(OBJECTLIST)
 
     overloadedFunction(noCommentFile)
-    print("Operator Overloading : ", NUMOFOPERATOROVERL) # sort of done
+    print("Operator Overloading : ", NUMOFOPERATOROVERL)
 
-    constructorFun(noCommentFile)
-    print("Constructors         : ", NUMOFCONSTRUCTOR) # sort of done
+    constructorDefinition(noCommentFile)
+    print("Constructors         : ", NUMOFCONSTRUCTOR)

@@ -123,12 +123,7 @@ class Counter //base class
   protected:            //NOTE: not private
     unsigned int count; //count
   public:
-    Counter() : count(0) //no-arg constructor
-    {
-    }
-    Counter(int c) : count(c) //1-arg constructor
-    {
-    }
+    Counter() : count(0) {} Counter(int c) : count(c) {}
     unsigned int get_count() const //return count
     {
         return count;
