@@ -53,7 +53,7 @@ int main()
     }
 
     // Declare a empty sparse matrix
-    SparseMatrix SM(row ,col ,elements);
+    SparseMatrix SM(row ,col ,int(elements))  ; SparseMatrix SM(row ,col ,int(elements))  ;
     // cout<<"Sparse Matrix Constructor Run Successfully"<<endl;
 
     //Construct a sparse matrix with k random values inserted at k random positions in the sparse matrix
@@ -75,7 +75,7 @@ int main()
 }
 
 //Constructor of the SparseMatrix Class
-SparseMatrix::SparseMatrix(int row , int col , int elements)
+SparseMatrix  ::   SparseMatrix(int row , int col , int elements)
 {
 	//Root of the sparse matrix stores the number of rows , columns and the number of elements in the matrix.
 	Root.row = row;

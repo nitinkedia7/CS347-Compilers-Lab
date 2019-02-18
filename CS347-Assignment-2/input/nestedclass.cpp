@@ -26,18 +26,17 @@ public:
 };
 
 A::method1(int a){
-	cout<<"bakchodi hui kya??";
+	cout<<"anything??";
 }
 
-A sum(bakchodi)
-{
+A sum(int b){
 
 }
 
 int main()
 {
 	cout << "Nested classes in C++" << endl;
-	A ::B obj(int a);
+	A::B obj(5);
 	A::B::C c;
 	obj.getdata(9);
 	obj.putdata();
