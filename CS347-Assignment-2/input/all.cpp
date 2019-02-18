@@ -80,7 +80,7 @@ class A
     void print() { cout << x; }
 };
 
-class B : public A
+bclass B : public A
 {
   public:
     B() { setX(10); }

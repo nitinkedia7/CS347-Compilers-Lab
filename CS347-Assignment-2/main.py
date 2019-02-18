@@ -57,8 +57,6 @@ class CppParser:
             class_names = re.findall(class_finder, line)
             inherited_class_finder = r'\bclass\b\s+([A-Za-z_]\w*)\s*\:\s*((?:public|private|protected)?\s+(?:[A-Za-z_]\w*)\s*\,?\s*)+[\n\{]'
             inherited_class_names = re.findall(inherited_class_finder, line)
-            # in_class_finder = r'\bclass\b\s+([A-Za-z_]\w*)\s*\:\s*(public|private|protected)?\s+[A-Za-z_]\w*\s*[\n\{]'
-            # inherited_class_names = re.findall(in_class_finder, line)
             class_names = list(filter(None, class_names))
             if len(class_names) > 0:
                 class_found_flag = True
@@ -93,17 +91,20 @@ class CppParser:
         text_lines = complete_text.split('\n')
         for line in text_lines:
             line = line + '\n'
-            constructors_finder = r'(?:[^~]|^)\b([A-Za-z_][\w\:\s]*)\s*\(([^)]*?)\)?\s*[\n\{\:]'
-            # constructors_finder = r'(?:[^~]|^)\b([A-Za-z_][A-Za-z\:_0-9]*)\s*(\([^\n\{\:]*?)[\n\{\:]'            
+            constructors_finder = r'(?:[^~]|^)\b([A-Za-z_][\w\:\s]*)\s*\(([^)]*?)\)?\s*[\n\{\:]'          
             constructors_list = re.findall(constructors_finder, line)
             constructor_found = False
             for definition in constructors_list:
                 belonging_class = definition[0].split('::')
                 length = len(belonging_class)
                 belonging_class = [x.strip() for x in belonging_class]
-                if belonging_class[length - 1] in self.class_names and belonging_class[length - 1] == belonging_class[0]:
-                    constructor_found = True
-                    self.constructor_types.append(definition)
+                if belonging_class[-1] in self.class_names:
+                    if length == 1:
+                        constructor_found = True
+                        self.constructor_types.append(definition)
+                    elif belonging_class[-1] == belonging_class[-2]:
+                        constructor_found = True
+                        self.constructor_types.append(definition)
             if constructor_found:
                 self.num_of_constructors = self.num_of_constructors + 1
 
@@ -113,8 +114,7 @@ class CppParser:
         for line in text_lines:
             line = line + '\n'
             operators = r'(\+=|-=|\*=|/=|%=|\^=|&=|\|=|<<|>>|>>=|<<=|==|!=|<=|>=|<=>|&&|\|\||\+\+|--|\,|->\*|\\->|\(\s*\)|\[\s*\]|\+|-|\*|/|%|\^|&|\||~|!|=|<|>)'
-            overloaded_operators_finder = r'\boperator\b\s*' + operators + r'\s*([^\{\;]*)?[\n\{]'            
-            # overloaded_operators_finder = r'\boperator\b([\(\)\+\-\/\<\>\=\:\[\]\s]*)([^\{\;]*?)[\n\{]'
+            overloaded_operators_finder = r'\boperator\b\s*' + operators + r'\s*([^\{\;]*)?[\n\{]'         
             overloaded_operators = re.findall(overloaded_operators_finder, line)
             if len(overloaded_operators) > 0:
                 self.num_of_operator_over = self.num_of_operator_over + 1
@@ -125,11 +125,7 @@ class CppParser:
         text_lines = complete_text.split('\n')
         for line in text_lines:
             line = line + '\n'
-            objects_finder = r'([A-Za-z_]\w*)\s*([\s\*]*[A-Za-z_\,\s][A-Za-z0-9_\.\,\[\]\s\(\)]*[^\n\{]*?);'
-            # objects_finder = r'([A-Za-z_]\w*\**)\s+([\s\*]*[A-Za-z_\,\s][\w\,\[\]\s\(\)]*[^\n\:]*?);'
-            # objects_finder = r'([A-Za-z_]\w*\**)\s+([\s\*]*[A-Za-z_\,\s][\w\,\[\]\s\(\)]*[^\n]*?);'            
-            # objects_finder = r'([A-Za-z_]\w*\**)\s+((?:[\s\*]*[A-Za-z_][\w\,\[\]\s\(\)])*[^\n]*?);' 
-            # ([A-Za-z_]\w*\**)\s+((?:[\s\*]*[A-Za-z_][\w\,\[\]\s\(\)]*)*[^\n]*?);
+            objects_finder = r'([A-Za-z_]\w*)\b\s*([\s\*]*[A-Za-z_\,][A-Za-z0-9_\.\,\[\]\s\(\)]*[^\n<>]*?);'
             class_object_list = re.findall(objects_finder, line)
             object_found = False
             for objects in class_object_list:
