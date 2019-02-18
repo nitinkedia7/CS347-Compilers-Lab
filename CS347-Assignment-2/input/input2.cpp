@@ -11,9 +11,7 @@ class circle //graphics circle
     fstyle fillstyle; //fill pattern
   public:
     //constructor
-    circle(int x, int y, int r, color fc, fstyle fs) : xCo(x), yCo(y), radius(r), fillcolor(fc), fillstyle(fs)
-    {
-    }
+    circle(int x, int y, int r, color fc, fstyle fs);
     void draw() //draws the circle
     {
         set_color(fillcolor);          //set color
@@ -21,6 +19,9 @@ class circle //graphics circle
         draw_circle(xCo, yCo, radius); //draw solid circle
     }
 };
+circle  ::  circle(int x, int y, int r, color fc, fstyle fs) : xCo(x), yCo(y), radius(r), fillcolor(fc), fillstyle(fs)
+    {
+    }
 ////////////////////////////////////////////////////////////////
 int main()
 {
@@ -156,7 +157,7 @@ int main()
     --c2;
     --c2;                               //decrement c2
     cout << “\nc2 =” << c2.get_count(); //display it
-    CountDn c3 = --c2;                  //create c3 from c2
+    CountDn c3 = --c2, c4;                  //create c3 from c2
     cout << “\nc3 =” << c3.get_count(); //display c3 Distance dist2(11, 6.25);  
     cout << endl;
     return 0;
