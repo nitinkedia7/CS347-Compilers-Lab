@@ -26,5 +26,5 @@ EQUI_JOIN                       {printf("<%s> ",yytext ); return EQUI_JOIN;}
 [0-9]+                          {printf("<%s> ",yytext ); return INT; }
 \n                              {printf("%s ",yytext ); return NEWLINE; }
 [ \t]                           {/* ignore whitespace */ }
-.                               {printf("Unknown character %c\n", *yytext); }
+.                               {printf("Unknown character %c\n", *yytext);}
 %%
