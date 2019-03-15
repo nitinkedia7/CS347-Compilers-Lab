@@ -18,23 +18,29 @@ void yyerror(char* s);
 %%
 stmt_list: stmt NEWLINE stmt_list
     | stmt
+    | error NEWLINE stmt_list 
+    
 ;
-stmt: SELECT LA condition RA LP table_name RP
-    | PROJECT LA attr_list RA LP table_name RP
-    | LP table_name RP CARTESIAN_PRODUCT LP table_name RP
-    | LP table_name RP EQUI_JOIN LA condition RA LP table_name RP
+stmt: SELECT LA condition RA LP table_name RP       {printf("\nValid Syntax");}
+    | PROJECT LA attr_list RA LP table_name RP      {printf("\nValid Syntax");}
+    | LP table_name RP CARTESIAN_PRODUCT LP table_name RP       {printf("\nValid Syntax");}
+    | LP table_name RP EQUI_JOIN LA condition RA LP table_name RP       {printf("\nValid Syntax");}
+    | %empty
 ;
 
 attr_list: attr COMMA attr_list
     | attr
+   
 ;
 
 condition: cond2 OR condition 
     | cond2
+   
 ;
 
 cond2: expr AND cond2
     | expr
+   
 ;
 
 expr: col op col
@@ -44,10 +50,12 @@ expr: col op col
     | QUOTED_STRING op col
     | LP condition RP
     | NOT LP condition RP
+   
 ;
 
 col: table_name DOT column_name
     | column_name
+   
 ;
 
 op: LA
@@ -56,6 +64,7 @@ op: LA
     | GE
     | EQUAL
     | NOT_EQUAL
+   
 ;
 
 table_name: ID
