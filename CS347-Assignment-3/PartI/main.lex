@@ -1,12 +1,16 @@
 %{
     #include <stdio.h>
+    #include <stdlib.h>
     #include <string.h>
 
+    void comments_removal(FILE*, FILE*);
     void increase_counts(void);
     void add_class(char*);
     int check_class(char*);
     void print_classes();
     void objects(char*);
+
+
     char temp_class[1460];
     char classes[10000][200];
     int tempi=0;
@@ -43,7 +47,7 @@ dec   public|private|protected
 <X3>[^*/]             BEGIN(X2);
 <X3>"/"               BEGIN(C2);
 
-\"                  BEGIN(A1);
+\"                    BEGIN(A1);
 <A1>\\.               BEGIN(A1);
 <A1>[^\\\"]           BEGIN(A1);
 <A1>\"                BEGIN(INITIAL); 
@@ -104,7 +108,7 @@ void add_class(char *temp_class){
 int check_class(char *class_name){
     int i;
     for(i=0;i<tempi;i++){
-        printf("%s-%d-%s-%d\n", class_name, strlen(class_name), classes[i], strlen(classes[i]));
+        printf("%s-%d-%s-%d\n", class_name, (int)strlen(class_name), classes[i], (int)strlen(classes[i]));
         if(strcmp(class_name, classes[i]) == 0){
             printf("%s-matched\n", class_name);
             return 1;
@@ -131,7 +135,7 @@ void print_classes(){
     int i;
     printf("Printing classes : \n");
     for(i=0;i<tempi;i++){
-        printf("%s-hello\n", classes[i]);
+        printf("Class Name -- %s\n", classes[i]);
     }
 }
 
@@ -144,13 +148,77 @@ void increase_counts(){
     class_found = inherited_found = constructor_found = operator_found = object_found = 0;
 }
 
+void comments_removal(FILE* source, FILE* destination){
+    int singleline_comment_found = 0, multiline_comment_found = 0, length=0, i=0, string_started=0;
+    char *read_line;
+    read_line = malloc(1000);
+    memset(read_line, 0, sizeof(read_line));
+    size_t max_length = 1000;
+    while(getline(&read_line, &max_length, source)!=-1){
+        length = (int)strlen(read_line);
+        if(read_line[length-1]=='\n'){
+            length--;
+        }
+        // printf("%d\n", (int)length);
+        singleline_comment_found = string_started = 0;
+        for(i=0;i<length;i++){
+            if(string_started && read_line[i] == '\"' && read_line[i-1] != '\\'){
+                string_started = 0;
+                read_line[i-1] = ' ';
+                read_line[i] = ' ';
+            }
+            else if(multiline_comment_found == 1 && read_line[i] == '*' && read_line[i+1] == '/'){
+                multiline_comment_found = 0;
+                read_line[i] = ' ';
+                read_line[i+1] = ' ';
+                i++;
+            }
+            else if(string_started){
+                read_line[i-1] = ' ';
+            }
+            else if(singleline_comment_found || multiline_comment_found){
+                read_line[i] = ' ';
+            }
+            else if(read_line[i] == '\"' && read_line[i-1] != '\\'){
+                string_started = 1;
+            }
+            else if(read_line[i] == '/' && read_line[i+1] == '/'){
+                singleline_comment_found = 1;
+                read_line[i] = ' ';
+                read_line[i+1] = ' ';
+                i++;
+            }
+            else if(read_line[i] == '/' && read_line[i+1] == '*'){
+                multiline_comment_found = 1;
+                read_line[i] = ' ';
+                read_line[i+1] = ' ';
+                i++;
+            }
+        }
+        fprintf(destination, "%s", read_line);
+        memset(read_line, 0, sizeof(read_line));
+    }
+}
+
 void main(int argc, char **argv){
     argv++;
     argc--;
-    if ( argc > 0 )
-        yyin = fopen( argv[0], "r" );
-    else
-        yyin = stdin;
+    if(argc == 0){
+        printf("Supply file name\n");
+        exit(0);
+    }
+    FILE* file_ptr = fopen(argv[0], "r");
+    if(file_ptr == NULL){
+        printf("File not found!\n");
+        exit(0);
+    }
+    FILE* file_inter = fopen("intermediate.txt", "w");
+    comments_removal(file_ptr, file_inter);   
+    fclose(file_inter);
+    fclose(file_ptr);
+    file_ptr = fopen("intermediate.txt", "r");
+    // yyin = fopen(argv[0], "r" );
+    yyin = file_ptr;
     yylex();
     increase_counts();
     printf("\nNumber of Classes           : %d\n", number_of_classes);
