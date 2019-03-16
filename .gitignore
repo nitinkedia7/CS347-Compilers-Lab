@@ -1,5 +1,4 @@
 *.out
-*input.txt
 intermediate.txt
 *.asm
 **/.vscode/*
