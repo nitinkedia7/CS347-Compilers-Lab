@@ -5,7 +5,7 @@
 
 extern int yylex();
 extern int yyparse();
-
+extern int yylineno;
 void yyerror(char* s);
 %}
 
@@ -18,13 +18,15 @@ void yyerror(char* s);
 %%
 stmt_list: stmt NEWLINE stmt_list
     | stmt
-    | error NEWLINE stmt_list 
-    
+    | error NEWLINE {printf("error: syntax error in line number %d\n\n",yylineno-1);} stmt_list    
 ;
-stmt: SELECT LA condition RA LP table_name RP       {printf("\nValid Syntax");}
-    | PROJECT LA attr_list RA LP table_name RP      {printf("\nValid Syntax");}
-    | LP table_name RP CARTESIAN_PRODUCT LP table_name RP       {printf("\nValid Syntax");}
-    | LP table_name RP EQUI_JOIN LA condition RA LP table_name RP       {printf("\nValid Syntax");}
+
+    
+
+stmt: SELECT LA condition RA LP table_name RP       {printf("\nValid Syntax\n");}
+    | PROJECT LA attr_list RA LP table_name RP      {printf("\nValid Syntax\n");}
+    | LP table_name RP CARTESIAN_PRODUCT LP table_name RP       {printf("\nValid Syntax\n");}
+    | LP table_name RP EQUI_JOIN LA condition RA LP table_name RP       {printf("\nValid Syntax\n");}
     | %empty
 ;
 
@@ -82,6 +84,7 @@ int main(int argc, char **argv)
 }
 
 void yyerror(char *s)
-{
-  fprintf(stderr, "error: %s\n", s);
+{      
+    // printf( "error!!: %s at line %d\n", s, yylineno);
+    // fflush(stdout);
 }

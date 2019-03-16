@@ -24,7 +24,7 @@ EQUI_JOIN                       {printf("<%s> ",yytext ); return EQUI_JOIN;}
 [)]                             {printf("<%s> ",yytext ); return RP;}
 [A-Za-z_][0-9A-Za-z_]*          {printf("<%s> ",yytext ); return ID; }
 [0-9]+                          {printf("<%s> ",yytext ); return INT; }
-\n                              {printf("%s ",yytext ); return NEWLINE; }
+\n                              {printf("%s ",yytext ); yylineno++; return NEWLINE; }
 [ \t]                           {/* ignore whitespace */ }
 .                               {printf("Unknown character %c\n", *yytext);}
 %%
