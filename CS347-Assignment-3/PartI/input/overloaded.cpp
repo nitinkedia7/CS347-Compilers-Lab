@@ -54,9 +54,8 @@ int main()
 #include <set>
 #pragma warning(disable : 4786)
 #include <string>
-#define cl class
 using namespace std;
-cl person
+class person
 {
   private:
 	string lastName;
@@ -94,7 +93,7 @@ bool operator<(const person &p1, const person &p2)
 }
 //--------------------------------------------------------------
 // function object to compare persons using pointers
-cl comparePersons
+class comparePersons
 {
   public:
 	bool operator()(const person *ptrP1,
