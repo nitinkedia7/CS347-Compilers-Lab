@@ -32,7 +32,7 @@ OP \+=|-=|\*=|\/=|%=|\^=|&=|\|=|<<|>>|>>=|<<=|==|!=|<=|>=|<=>|&&|\|\||\+\+|--|\,
 dec   public|private|protected
 
 %option noyywrap
-%x S1 S2 S3 A1 C1 C2 C3 C4 C5 X1 X2 X3 D1 D2 D3 D4 E1 E2 E3 E4 E5 
+%x S1 S2 S3 A1 C1 C2 C3 C4 C5 X1 X2 X3 D1 D2 D3 D4 E1 E2 E3 E4 E5
 %%
 "/*"                  BEGIN(S2);
 <S2>[^*]              ;
@@ -56,48 +56,48 @@ dec   public|private|protected
 
 [^A-Za-z0-9_]class[ ]+    { if(yytext[0] == '\n'){increase_counts();} BEGIN(C1); }
 <C1>{st}{wd}*             { /*printf("%s-hello", yytext) ;*/  memset(temp_class, 0, sizeof(temp_class)) ; snprintf(temp_class, 200, "%s", yytext); BEGIN(C2) ; }
-<C2>" "                   { BEGIN(C2) ; } 
-<C2>\n                    { class_found = 1; increase_counts(); add_class(temp_class); BEGIN(INITIAL);}
-<C2>"{"|"//"[^\n]*        { class_found = 1; add_class(temp_class); /*printf("%s-was here\n", temp_class);*/ BEGIN(INITIAL); }
+<C2>[ \t]                 { BEGIN(C2) ; } 
+<C2>\n                    { class_found = 1; increase_counts(); if(check_class(temp_class)==0){add_class(temp_class);} BEGIN(INITIAL);}
+<C2>"{"                   { class_found = 1; if(check_class(temp_class)==0){add_class(temp_class);} /*printf("%s-was here\n", temp_class);*/ BEGIN(INITIAL); }
 <C2>":"                   { BEGIN(C3); }  
 <C2>"/*"                  { BEGIN(X2); }
-<C2>[^\n{:]               { BEGIN(INITIAL);}
-<C3>" "                   { BEGIN(C3); }
+<C2>[^\n{:]               { add_class(temp_class); BEGIN(INITIAL);}
+<C3>[ \t]                 { BEGIN(C3); }
 <C3>{dec}                 { BEGIN(C3); }
 <C3>{st}{wd}*             { BEGIN(C4); }
-<C4>" "                   { BEGIN(C4); }
+<C4>[ \t]                 { BEGIN(C4); }
 <C4>","                   { BEGIN(C3); }
-<C4>\n                    { inherited_found = 1, class_found = 1; increase_counts(); add_class(temp_class); BEGIN(INITIAL);}
-<C4>"{"                   { class_found = 1, inherited_found = 1; add_class(temp_class); BEGIN(INITIAL); }
-<C4>[^,\n{ ]              { BEGIN(INITIAL);}
+<C4>\n                    { inherited_found = 1, class_found = 1; increase_counts(); if(check_class(temp_class)==0){add_class(temp_class);} BEGIN(INITIAL);}
+<C4>"{"                   { class_found = 1, inherited_found = 1; if(check_class(temp_class)==0){add_class(temp_class);} BEGIN(INITIAL); }
+<C4>[^,\n{ ]              { add_class(temp_class); BEGIN(INITIAL);}
 
 [~]                       { BEGIN(E1);}
 <E1>{st}{wd}*             { BEGIN(E1); }
-<E1>" "                   ;
+<E1>[ \t]                 ;
 <E1>[(]                   { BEGIN(E3);}
 <E3>[^)]                  ;
 <E3>[)]                   { BEGIN(E4);}
 <E4>[ ]                   { BEGIN(E4);}
 <E4>[{:]                  { BEGIN(INITIAL);}
-<E4>\n                    {increase_counts(); BEGIN(INITIAL);}
+<E4>\n                    { increase_counts(); BEGIN(INITIAL);}
 <E4>[^\n{:]               { BEGIN(INITIAL);} 
 
 
-{st}{wd}*[ ]*[(]          { memset(temp_class, 0, sizeof(temp_class)) ; sscanf(yytext, "%[A-Za-z0-9_]s", temp_class); BEGIN(D3);}
-<D1>" "                   { BEGIN(D1);}
+{st}{wd}*[ ]*[(]          { memset(temp_class, 0, sizeof(temp_class)) ; sscanf(yytext, "%[A-Za-z0-9_]s", temp_class); BEGIN(D3) ; /* printf("%s-const-%d-%s-\n", yytext, yylineno, temp_class); */}
+<D1>[ \t]                 { BEGIN(D1);}
 <D1>[(]                   { BEGIN(D3);}
 <D3>[^)]                  { BEGIN(D3);}
 <D3>[)]                   { BEGIN(D4);}
 <D4>[ \t]                 { BEGIN(D4);}
-<D4>[{:]                  { if (check_class(temp_class)) {constructor_found = 1;} /* printf("%s-was here\n", temp_class);*/ BEGIN(INITIAL);}
-<D4>\n                    { if (check_class(temp_class)) {constructor_found = 1;} increase_counts(); /*printf("%s-was here\n", temp_class);*/ BEGIN(INITIAL);}
+<D4>[{:]                  { if (check_class(temp_class)){ constructor_found = 1; printf("######%s#######", temp_class);} /* printf("%s-was here\n", temp_class);*/ BEGIN(INITIAL);}
+<D4>\n                    { if (check_class(temp_class)) {constructor_found = 1; printf("######%s#######", temp_class); }increase_counts(); /*printf("%s-was here\n", temp_class);*/ BEGIN(INITIAL);}
 <D4>[^\n{:]               { BEGIN(INITIAL);} 
 
-[^A-Za-z_]operator" "*{OP}" "*([^\{\;\n]*)[\n\{]     { operator_found = 1; if(yytext[yyleng-1]=='\n'){increase_counts();}}
+[^A-Za-z_]operator" "*{OP}" "*([^\{\;\n]*)[\n\{]     { /*printf("%s\n", yytext);*/ operator_found = 1; if(yytext[yyleng-1]=='\n'){increase_counts();}}
 .                         ;    
 \n                        { increase_counts();}
 
-{st}{wd}*[*]*[ ]+[*]*[A-Za-z0-9_,][A-Za-z0-9_,.\[\] ()]*[^\n;<>]*;  { /* printf("%s\n", yytext);*/ objects(yytext);}      
+{st}{wd}*[*]*[ ]+[*]*[A-Za-z0-9_,][A-Za-z0-9_,.\[\] ()]*[^\n;<>]*;  {/* printf("%s\n", yytext); */ objects(yytext);}      
 
 %%
 void add_class(char *temp_class){
