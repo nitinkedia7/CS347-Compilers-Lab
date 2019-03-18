@@ -47,12 +47,9 @@ dec   public|private|protected
 <X3>[^*/]             BEGIN(X2);
 <X3>"/"               BEGIN(C2);
 
-\"                    BEGIN(A1);
-<A1>\\.               BEGIN(A1);
-<A1>[^\\\"]           BEGIN(A1);
-<A1>\"                BEGIN(INITIAL); 
-
 "//"[^\n]*            increase_counts(); 
+
+[^A-Za-z_]operator" "*{OP}" "*([^\{\;\n]*)[\n\{]     { /*printf("%s\n", yytext);*/ operator_found = 1; if(yytext[yyleng-1]=='\n'){increase_counts();}}
 
 [^A-Za-z0-9_]class[ ]+    { if(yytext[0] == '\n'){increase_counts();} BEGIN(C1); }
 <C1>{st}{wd}*             { /*printf("%s-hello", yytext) ;*/  memset(temp_class, 0, sizeof(temp_class)) ; snprintf(temp_class, 200, "%s", yytext); BEGIN(C2) ; }
@@ -70,6 +67,7 @@ dec   public|private|protected
 <C4>\n                    { inherited_found = 1, class_found = 1; increase_counts(); if(check_class(temp_class)==0){add_class(temp_class);} BEGIN(INITIAL);}
 <C4>"{"                   { class_found = 1, inherited_found = 1; if(check_class(temp_class)==0){add_class(temp_class);} BEGIN(INITIAL); }
 <C4>[^,\n{ ]              { add_class(temp_class); BEGIN(INITIAL);}
+
 
 [~]                       { BEGIN(E1);}
 <E1>{st}{wd}*             { BEGIN(E1); }
@@ -89,15 +87,14 @@ dec   public|private|protected
 <D3>[^)]                  { BEGIN(D3);}
 <D3>[)]                   { BEGIN(D4);}
 <D4>[ \t]                 { BEGIN(D4);}
-<D4>[{:]                  { if (check_class(temp_class)){ constructor_found = 1; printf("######%s#######", temp_class);} /* printf("%s-was here\n", temp_class);*/ BEGIN(INITIAL);}
-<D4>\n                    { if (check_class(temp_class)) {constructor_found = 1; printf("######%s#######", temp_class); }increase_counts(); /*printf("%s-was here\n", temp_class);*/ BEGIN(INITIAL);}
+<D4>[{:]                  { if (check_class(temp_class)){ constructor_found = 1; /* printf("######%s#######", temp_class);*/ } /* printf("%s-was here\n", temp_class);*/ BEGIN(INITIAL);}
+<D4>\n                    { if (check_class(temp_class)) {constructor_found = 1; /* printf("######%s#######", temp_class);*/ }increase_counts(); /*printf("%s-was here\n", temp_class);*/ BEGIN(INITIAL);}
 <D4>[^\n{:]               { BEGIN(INITIAL);} 
 
-[^A-Za-z_]operator" "*{OP}" "*([^\{\;\n]*)[\n\{]     { /*printf("%s\n", yytext);*/ operator_found = 1; if(yytext[yyleng-1]=='\n'){increase_counts();}}
 .                         ;    
 \n                        { increase_counts();}
 
-{st}{wd}*[*]*[ ]+[*]*[A-Za-z0-9_,][A-Za-z0-9_,.\[\] ()]*[^\n;<>]*;  {/* printf("%s\n", yytext); */ objects(yytext);}      
+{st}{wd}*[*]*[ ]+[*]*[A-Za-z0-9_,][A-Za-z0-9_,\.\[\] ()]*[^\n;<>]*;  {/* printf("%s\n", yytext); */ objects(yytext);}      
 
 %%
 void add_class(char *temp_class){
@@ -119,6 +116,7 @@ int check_class(char *class_name){
 
 void objects(char *temp_char){
     char classname[250];
+    // printf("%s\n", temp_char);
     memset(classname, 0, sizeof(classname));
     sscanf(temp_char, "%s", classname);
     int length = strlen(classname);
@@ -126,9 +124,13 @@ void objects(char *temp_char){
         classname[length-1] = '\0';
         length--;
     }
+    if(strstr(temp_char, "operator") && strstr(temp_char, "{")){
+        operator_found=1;
+        return;
+    }
     if(check_class(classname)){
         object_found = 1;
-        // printf("%s\n", classname);
+        //printf("%s\n", temp_char);
     }
 }
 void print_classes(){
@@ -224,7 +226,7 @@ void main(int argc, char **argv){
     increase_counts();
     printf("\nNumber of Classes           : %d\n", number_of_classes);
     printf("Number of Inherited classes : %d\n", number_of_inherited_classes);
-    print_classes();
+    // print_classes();
     printf("Number of Constructors      : %d\n", number_of_constructors);
     printf("Number of Overloading       : %d\n", number_of_overloading);
     printf("Number of Objects           : %d\n", number_of_objects);
