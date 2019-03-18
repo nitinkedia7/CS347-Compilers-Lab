@@ -1,13 +1,11 @@
 #include <iostream>
-#define cl class
-#define pb public
 using namespace std;
 
-cl classes{
+class classes{
 
 }
 
-cl Area
+class Area
 {
   private:
     int length;
@@ -37,8 +35,6 @@ cl Area
 };
 
 Area::Area();
-{}
-
 Area::Area()
 {}
 
@@ -65,7 +61,7 @@ T &operator=(const T &other) // copy assignment
     return *this;
 }
 
-class Child : pb Area
+class Child : public Area
 {
   public:
     int id_c;
@@ -80,7 +76,7 @@ class A
     void print() { cout << x; }
 };
 
-bclass B : public A
+class B : public A
 {
   public:
     B() { setX(10); }
