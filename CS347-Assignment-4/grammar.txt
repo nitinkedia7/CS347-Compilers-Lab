@@ -22,8 +22,8 @@ expr := col op col
         | LP condition RP
         | NOT LP condition RP
 
-col := table_name DOT column_name
-        | column_name    
+col := ID DOT ID
+        | ID    
 
 op := LA
     | RA
