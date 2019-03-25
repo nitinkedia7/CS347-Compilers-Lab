@@ -18,11 +18,11 @@ EQUI_JOIN                       { return EQUI_JOIN;}
 "NOT"                           { return NOT;}
 ,                               { return COMMA;}
 \.                              { return DOT;}
-'[A-Za-z_][0-9A-Za-z_]*'        { return QUOTED_STRING;}
+'[A-Za-z_][0-9A-Za-z_]*'        { sprintf(yylval.text,"%s", yytext); return QUOTED_STRING;}
 [(]                             { return LP;}
 [)]                             { return RP;}
-[A-Za-z_][0-9A-Za-z_]*          { return ID; }
-[0-9]+                          { return INT; }
+[A-Za-z_][0-9A-Za-z_]*          { sprintf(yylval.text,"%s", yytext); return ID; }
+[0-9]+                          { yylval.intval = atoi(yytext); return INT; }
 \n                              { yylineno++; return NEWLINE; }
 [ \t]                           { /* ignore whitespace */ }
 .                               { printf("Unknown character %c\n", *yytext);}
