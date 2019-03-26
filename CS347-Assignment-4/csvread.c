@@ -6,22 +6,20 @@ int checkTableName(char* tablename){
     FILE* file = fopen("tablenames.txt","r");
     char str[1000];
     const char s[2] = ",";
-    while(fgets(str, 1000, file)){
-        char *token;
-        sscanf(str, "%[^\n]s", str);
-        token = strtok(str, s);
-        char table[100];
-        memset(table, 0, 100);
-        sprintf(table, "%s.csv", tablename);
-        // strcat(tablename,".csv");
-        while( token != NULL ) {
-            // printf( "%s ", token );
-            if(strcmp(token,table)==0){
-                return 1;
-            }
-            token = strtok(NULL, s);         
+    fgets(str, 1000, file);
+    char *token;
+    sscanf(str, "%[^\n]s", str);
+    token = strtok(str, s);
+    char table[100];
+    memset(table, 0, 100);
+    sprintf(table, "%s.csv", tablename);
+    // strcat(tablename,".csv");
+    while( token != NULL ) {
+        // printf( "%s ", token );
+        if(strcmp(token,table)==0){
+            return 1;
         }
-        // printf("\n");
+        token = strtok(NULL, s);         
     }
     fclose(file);
     return 0;

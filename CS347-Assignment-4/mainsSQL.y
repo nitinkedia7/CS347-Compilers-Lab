@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include "csvread.c"
 
 extern int yylex();
 extern int yyparse();
@@ -17,6 +17,7 @@ char *ccondition;
 %}
 
 %code requires{
+    
     #include "comparator.h"
 }
 
@@ -86,16 +87,25 @@ stmt: SELECT LA condition RA LP ID RP
     }
     | PROJECT LA attr_list RA LP ID RP
     {
-        printf("no of cols = %d\n", vals);    
+        // printf("no of cols = %d\n", vals);
+        int flag=checkTableName($6);
+        if (flag==0) {
+            printf("Error: no table found\n");
+        }
+        else {
+            printColumns(list, vals, $6);
+        }
+    
 
     }
     | LP ID RP CARTESIAN_PRODUCT LP ID RP       
     {
-
+        // printf("hello %s %s\n", $2, $6);
+        printCartesianProducts($2, $6);
     }
     | LP ID RP EQUI_JOIN LA condition RA LP ID RP       
     {
-        
+
     }
     | %empty
 ;
@@ -153,14 +163,10 @@ expr: col op col
         
         $$.table1 = $1.table;
         $$.table2 = $3.table;
-        $$.col1 = malloc(100);
-        $$.col2 = malloc(100);
-        memset($$.col1, 0, 100);
-        memset($$.col2, 0, 100);        
+        $$.col1 = malloc(100);  memset($$.col1, 0, 100);
+        $$.col2 = malloc(100);  memset($$.col2, 0, 100); 
         sprintf($$.col1, "%s", $1.col);
         sprintf($$.col2, "%s", $3.col);
-        // printf("paji special %s\n", $$.col1);
-        // printf("paji special %s\n", $$.col2);
         $$.operation = $2.type;
         $$.int1_fnd = 0;
         $$.int2_fnd = 0;
@@ -171,8 +177,8 @@ expr: col op col
     | col op INT 
     {
         // printf("int val : %d\n", $3);
-        
-        $$.table1 = $1.table;
+        if($1.table==NULL){ $$.table1 = $1.table; }
+        else { $$.table1 = malloc(100); memset($$.table1, 0, 100); sprintf($$.table1, "%s", $1.table);}
         $$.table2 = NULL;
         $$.col1 = malloc(100);
         $$.col2 = NULL;
