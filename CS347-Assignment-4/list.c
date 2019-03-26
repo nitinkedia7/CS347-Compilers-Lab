@@ -1,22 +1,36 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "list.h"
 
-typedef struct and_entry{
-    char *table1, *table2, *col1, *col2;
-    int val1, val2;
-    char *str1, *str2;
-    int operation, int1_fnd, int2_fnd;
-    struct and_entry* next_ptr;
-} and_entry;
+and_list join_and_list(struct and_list cond2, struct and_entry expr){
+    and_entry* new_elem = malloc(sizeof(and_entry));
+    memcpy(new_elem, &expr, sizeof (and_entry));
+    cond2.end->next_ptr = new_elem;
 
-typedef struct or_list {
-    and_entry* head;
-    and_entry* end;
-} or_list;
-
-or_list* join_list(struct or_list cond2, struct and_entry expr){
-    cond2.end->next_ptr = &expr;
-    cond2.end = &expr;
+    cond2.end = new_elem;
+    return cond2;
 }
 
+or_list join_or_list(struct or_list condition, struct and_list cond2){
+    and_list* new_elem = malloc(sizeof(and_list));
+    memcpy(new_elem, &cond2, sizeof (and_list));
+    condition.end->next_ptr = new_elem;
+    condition.end = new_elem;
+    return condition;
+}
+
+void print_list(struct or_list condition){
+    and_list* temp = condition.head;
+    while(temp!=NULL){
+        and_entry* temp2 = temp->head;
+        while(temp2!=NULL){
+            if(temp2->col1!=NULL){
+                printf("%s ; ", temp2->col1);
+            } else {
+                printf("%s ; ", temp2->col2);
+            }
+            temp2 = temp2->next_ptr;
+            
+        }
+        printf("\n");
+        temp = temp->next_ptr;
+    }
+}
