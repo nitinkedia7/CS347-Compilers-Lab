@@ -1,5 +1,6 @@
-A,salary,C
-int,int,int
-1,2,3
-290,300,400
-3,4,5
+A,salary,C,D
+int,int,int,str
+1,2,3,'hello'
+2,300,400,'bye'
+3,4,5,'eee'
+7,5,3,'eee'

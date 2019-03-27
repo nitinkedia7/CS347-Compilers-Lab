@@ -3,8 +3,12 @@
 #include <string.h>
 #include "list.h"
 
-void populate(char *);
-int getColIndex(char *);
+int getColIndex(char *, char *);
 char *retval(char *, int);
-int comparator(struct and_entry, char *);
-int compute_condition(struct or_list, char *);
+char *getType(char *, int);
+int select_comparator(struct and_entry, char *, char *);
+int select_compute_condition(struct or_list, char *, char *);
+int equi_comparator(struct and_entry, char *, char *, char *, char *);
+int equi_compute_condition(struct or_list, char *, char *, char *, char *);
+int associateTable(char *, char *, struct or_list *);
+void printEquiJoin(char *, char *, struct or_list *);
