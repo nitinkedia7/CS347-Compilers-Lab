@@ -3,6 +3,7 @@
 #include <string.h>
 #include "list.h"
 
+int complement(int);
 int getColIndex(char *, char *);
 char *retval(char *, int);
 char *getType(char *, int);

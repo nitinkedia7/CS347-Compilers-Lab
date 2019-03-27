@@ -1,5 +1,0 @@
-(test) EQUI_JOIN <test.A = test.A AND> (test2)
-SELECT <student_id<=5 AND score>50 OR attendance>=75> (enroll)
-(student) EQUI_JOIN <id = student_id AND score > 75 > (enroll)
-
-SELECT <score>=75> (enroll)
