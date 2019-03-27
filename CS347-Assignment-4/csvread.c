@@ -10,8 +10,8 @@ int checkTableName(char* tablename){
     char *token;
     sscanf(str, "%[^\n]s", str);
     token = strtok(str, s);
-    char table[100];
-    memset(table, 0, 100);
+    char table[200];
+    memset(table, 0, 200);
     sprintf(table, "%s.csv", tablename);
     // strcat(tablename,".csv");
     while( token != NULL ) {
@@ -89,11 +89,11 @@ void printColumns(char list[100][100], int vals, char* table){
 }
 
 void printCartesianProducts(char *table1, char *table2) {
-    char table1Name[100];
-    memset(table1Name, 0, 100);
+    char table1Name[200];
+    memset(table1Name, 0, 200);
     sprintf(table1Name, "%s.csv", table1);
-    char table2Name[100];
-    memset(table2Name, 0, 100);
+    char table2Name[200];
+    memset(table2Name, 0, 200);
     sprintf(table2Name, "%s.csv", table2);
     int a = checkTableName(table1);
     int b = checkTableName(table2);
@@ -145,21 +145,4 @@ void printCartesianProducts(char *table1, char *table2) {
         fclose(file2);     
     }
     fclose(file1);
-}
-
-int fileread(){
-    FILE* fileptr = fopen("test.csv", "r");
-    char str[100];
-    const char s[2] = ",";
-    while(fgets(str, 100, fileptr)){
-        char *token;
-        sscanf(str, "%[^\n]s", str);
-        token = strtok(str, s);
-        while( token != NULL ) {
-            printf( "%s ", token );
-            token = strtok(NULL, s);
-        }
-        // printf("\n");
-    }
-    fclose(fileptr);
 }

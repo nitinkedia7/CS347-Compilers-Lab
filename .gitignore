@@ -4,3 +4,6 @@ intermediate.txt
 **/.vscode/*
 **/output/
 Pipfile
+lex.yy.c
+*.tab.c
+*.tab.h

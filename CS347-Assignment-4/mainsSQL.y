@@ -16,8 +16,7 @@ int vals;
 char *ccondition;
 %}
 
-%code requires{
-    
+%code requires {
     #include "comparator.h"
 }
 
@@ -44,7 +43,7 @@ char *ccondition;
 
 /* declare tokens */
 %token SELECT PROJECT CARTESIAN_PRODUCT EQUI_JOIN
-%token LP RP LA RA EQUAL NOT_EQUAL LE GE DOT COMMA AND OR NOT RE
+%token LP RP LA RA EQUAL NOT_EQUAL LE GE DOT COMMA AND OR NOT
 %token INT QUOTED_STRING ID
 %token NEWLINE
 
@@ -68,22 +67,33 @@ stmt_list: stmt NEWLINE stmt_list
 stmt: SELECT LA condition RA LP ID RP
     {
         // print_list($3);
-        populate($6);
+        // populate($6);
         char fname[200];
         memset(fname,0,200);
         sprintf(fname,"%s.csv",$6);
-        FILE* file = fopen(fname,"r");
-        char str[1000];
-        fgets(str, 1000, file);
-        printf("%s", str);
-        fgets(str, 1000, file);
-        printf("%s", str);
-        while (fgets(str, 1000, file)) {
-            if (compute_condition($3, str))  {
-                printf("%s", str);
-            }
+        if(checkTableName($6)==0){
+            printf("Table not found!\n");
         }
-        fclose(file);        
+        else{
+            FILE* file = fopen(fname,"r");
+            char str[1000];
+            fgets(str, 1000, file);
+            printf("%s", str);
+            fgets(str, 1000, file);
+            // printf("%s", str);
+            while (fgets(str, 1000, file)) {
+                sscanf(str, "%[^\n]", str);
+                int returnResult = select_compute_condition($3, str, $6);
+                if (returnResult == -1){
+                    break;
+                }
+                else if (returnResult)  {
+                    printf("%s\n", str);
+                }
+            }
+            fclose(file);
+        }
+                
     }
     | PROJECT LA attr_list RA LP ID RP
     {
@@ -105,7 +115,18 @@ stmt: SELECT LA condition RA LP ID RP
     }
     | LP ID RP EQUI_JOIN LA condition RA LP ID RP       
     {
-
+         // check if the two table id's exist
+        if (!checkTableName($2)) {
+        fprintf(stderr, "Table %s not present\n", $2);
+        }
+        if (!checkTableName($9)) {
+            fprintf(stderr, "Table %s not present\n", $9);
+        }
+        // check for each condition unit.table1/2 is set and same as above id's, datatype
+        int x = associateTable($2, $9, &($6));
+        if (x == 1) {
+            printEquiJoin($2, $9, &($6));
+        }
     }
     | %empty
 ;
@@ -160,9 +181,10 @@ cond2: expr AND cond2
 
 expr: col op col 
     {
-        
-        $$.table1 = $1.table;
-        $$.table2 = $3.table;
+        if($1.table==NULL){ $$.table1 = $1.table; }
+        else { $$.table1 = malloc(100); memset($$.table1, 0, 100); sprintf($$.table1, "%s", $1.table);}
+        if($3.table==NULL){ $$.table2 = $3.table; }
+        else { $$.table2 = malloc(100); memset($$.table2, 0, 100); sprintf($$.table2, "%s", $3.table);}
         $$.col1 = malloc(100);  memset($$.col1, 0, 100);
         $$.col2 = malloc(100);  memset($$.col2, 0, 100); 
         sprintf($$.col1, "%s", $1.col);
@@ -180,7 +202,7 @@ expr: col op col
         if($1.table==NULL){ $$.table1 = $1.table; }
         else { $$.table1 = malloc(100); memset($$.table1, 0, 100); sprintf($$.table1, "%s", $1.table);}
         $$.table2 = NULL;
-        $$.col1 = malloc(100);
+        $$.col1 = malloc(100);  memset($$.col1, 0, 100);
         $$.col2 = NULL;
         sprintf($$.col1, "%s", $1.col);
         $$.operation = $2.type;
@@ -194,9 +216,10 @@ expr: col op col
     | INT op col
     {
         $$.table1 = NULL;
-        $$.table2 = $3.table;
+        if($3.table==NULL){ $$.table2 = $3.table; }
+        else { $$.table2 = malloc(100); memset($$.table2, 0, 100); sprintf($$.table2, "%s", $3.table);}
         $$.col1 = NULL;
-        $$.col2 = malloc(100);
+        $$.col2 = malloc(100);  memset($$.col2, 0, 100); 
         sprintf($$.col2, "%s", $3.col);
         $$.operation = $2.type;
         $$.int1_fnd = 1;
@@ -208,27 +231,34 @@ expr: col op col
     }
     | col op QUOTED_STRING
     {
-        $$.table1 = $1.table;
+        if($1.table==NULL){ $$.table1 = $1.table; }
+        else { $$.table1 = malloc(100); memset($$.table1, 0, 100); sprintf($$.table1, "%s", $1.table);}
         $$.table2 = NULL;
-        $$.col1 = $1.col;
+        $$.col1 = malloc(100);  memset($$.col1, 0, 100);
         $$.col2 = NULL;
+        sprintf($$.col1, "%s", $1.col);
         $$.operation = $2.type;
         $$.int1_fnd = 0;
         $$.int2_fnd = 0;
         $$.str1 = NULL;
-        $$.str2 = $3;
+        $$.str2 = malloc(100); memset($$.str2, 0, 100);
+        sprintf($$.str2, "%s", $3);
         $$.next_ptr = NULL;
+        // printf("%s %s\n", $$.col1, $$.str1);
     }
     | QUOTED_STRING op col
     {
         $$.table1 = NULL;
-        $$.table2 = $3.table;
+        if($3.table==NULL){ $$.table2 = $3.table; }
+        else { $$.table2 = malloc(100); memset($$.table2, 0, 100); sprintf($$.table2, "%s", $3.table);}
         $$.col1 = NULL;
-        $$.col2 = $3.col;
+        $$.col2 = malloc(100);  memset($$.col2, 0, 100); 
+        sprintf($$.col2, "%s", $3.col);
         $$.operation = $2.type;
         $$.int1_fnd = 0;
         $$.int2_fnd = 0;
-        $$.str1 = $1;
+        $$.str1 = malloc(100); memset($$.str1, 0, 100);
+        sprintf($$.str1, "%s", $1);
         $$.str2 = NULL;
         $$.next_ptr = NULL;
     }
