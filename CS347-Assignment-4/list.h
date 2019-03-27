@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+struct or_list;
 
 typedef struct and_entry{
     char *table1, *table2, *col1, *col2;
@@ -8,6 +9,9 @@ typedef struct and_entry{
     char *str1, *str2;
     int operation, int1_fnd, int2_fnd;
     struct and_entry* next_ptr;
+    int is_cond;
+    struct or_list* nest_condition;
+    int not_var;
 } and_entry;
 
 typedef struct and_list {

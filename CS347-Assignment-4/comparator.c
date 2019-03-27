@@ -1,5 +1,26 @@
 #include "comparator.h"
 
+int complement(int op) {
+    if (op == 1) {
+        return 2;
+    }
+    else if (op == 2) {
+        return 1;
+    }
+    else if (op == 3) {
+        return 4;
+    }
+    else if (op == 4) {
+        return 3;
+    }
+    else if (op == 5) {
+        return 5;
+    }
+    else if (op == 6) {
+        return 6;
+    }     
+}
+
 int getColIndex(char *table, char *column) { // table already .csv appended
     char tablecopy[200];
     memset(tablecopy,0,200);
@@ -113,7 +134,7 @@ int select_comparator(struct and_entry unit, char *str1, char* table_name) {
     if (unit.int1_fnd) {
         int colIndex = getColIndex(table_name, unit.col2);
         if (colIndex == -1) {
-            printf("Column not found\n");
+            printf("Column %s not found in table %s\n", unit.col2, table_name);
             return -1;
         }
         char *data_type = getType(table_name, colIndex);
@@ -128,7 +149,7 @@ int select_comparator(struct and_entry unit, char *str1, char* table_name) {
         // printf("I'm %s %s here\n", table_name, unit.col1);
         int colIndex = getColIndex(table_name, unit.col1);
         if (colIndex == -1) {
-            printf("Column not found\n");
+            printf("Column %s not found in table %s\n", unit.col1, table_name);
             return -1;
         }
         char *data_type = getType(table_name, colIndex);
@@ -139,10 +160,11 @@ int select_comparator(struct and_entry unit, char *str1, char* table_name) {
         unit.val1 = atoi(retval(str1, colIndex));
         return compareByOp(unit.val1, unit.val2, unit.operation);
     }
-    else if(unit.str1 == NULL){
+    else if(unit.str1 == NULL && unit.str2!=NULL){
+        // printf("I'm %s %s here\n", table_name, unit.str2);
         int colIndex = getColIndex(table_name, unit.col1);
         if (colIndex == -1) {
-            printf("Column not found\n");
+            printf("Column %s not found in table %s\n", unit.col1, table_name);
             return -1;
         }
         char *data_type = getType(table_name, colIndex);
@@ -153,10 +175,10 @@ int select_comparator(struct and_entry unit, char *str1, char* table_name) {
         unit.str1 = retval(str1, colIndex);
         return compareStringByOp(unit.str1, unit.str2, unit.operation);
     }
-    else if(unit.str2 == NULL){
+    else if(unit.str1 != NULL && unit.str2==NULL){
         int colIndex = getColIndex(table_name, unit.col2);
         if (colIndex == -1) {
-            printf("Column not found\n");
+            printf("Column %s not found in table %s\n", unit.col2, table_name);
             return -1;
         }
         char *data_type = getType(table_name, colIndex);
@@ -168,19 +190,30 @@ int select_comparator(struct and_entry unit, char *str1, char* table_name) {
         return compareStringByOp(unit.str1, unit.str2, unit.operation);
     }
     else {
-        int colIndex1 = getColIndex(unit.table1, unit.col1);
-        int colIndex2 = getColIndex(unit.table2, unit.col2);
+        int colIndex1 = getColIndex(table_name, unit.col1);
+        int colIndex2 = getColIndex(table_name, unit.col2);
         if (colIndex1 == -1) {
-            printf("Column %s not found in table %s\n", unit.col1, unit.table1);
+            printf("Column %s not found in table %s\n", unit.col1, table_name);
             return -1;
         }
         if (colIndex2 == -1) {
-            printf("Column %s not found in table %s\n", unit.col2, unit.table2);
+            printf("Column %s not found in table %s\n", unit.col2, table_name);
             return -1;
         }
-        unit.val1 = atoi(retval(str1, colIndex1));
-        unit.val2 = atoi(retval(str1, colIndex2));
-        return compareByOp(unit.val1, unit.val2, unit.operation);
+        if(strcmp(getType(table_name, colIndex1),getType(table_name, colIndex2)) != 0){
+            printf("Data Type mismatch\n");
+            return -1;
+        }
+        if(strcmp(getType(table_name, colIndex1), "str")){
+            unit.str1 = retval(str1, colIndex1);
+            unit.str2 = retval(str1, colIndex2);
+            return compareStringByOp(unit.str1, unit.str2, unit.operation);
+        }
+        else{
+            unit.val1 = atoi(retval(str1, colIndex1));
+            unit.val2 = atoi(retval(str1, colIndex2));
+            return compareByOp(unit.val1, unit.val2, unit.operation);
+        }
     }
     return -1;    
 }
@@ -196,9 +229,18 @@ int select_compute_condition(struct or_list condition, char *str, char* table_na
             char str_copy[1000];
             memset(str_copy, 0, 1000);
             sprintf(str_copy, "%s", str);
-            int ret = select_comparator(*temp2, str_copy, table_name);
+            int ret;
+            if (temp2->is_cond == 1) {
+                ret = select_compute_condition(*(temp2->nest_condition), str_copy, table_name);
+            }
+            else {
+                ret = select_comparator(*temp2, str_copy, table_name);
+            }
             if(ret == -1){
                 return -1;
+            }
+            if(temp2->is_cond ==1 && temp2->not_var){
+                ret = ret==0?1:0; 
             }
             val = val & ret;
             temp2 = temp2->next_ptr;
@@ -216,11 +258,28 @@ int equi_comparator(struct and_entry unit, char *str1, char *str2, char *table1,
     if (unit.int2_fnd) { // col op INT
         int colIndex = getColIndex(unit.table1, unit.col1);
         if (colIndex == -1) {
-            printf("Column not found\n");
+            printf("Column %s not found in table %s\n", unit.col1, unit.table1);
             return -1;
         }
-        unit.val1 = atoi(retval(str1, colIndex));
+        if (strcmp(unit.table1, table1) == 0)
+            unit.val1 = atoi(retval(str1, colIndex));
+        else 
+            unit.val1 = atoi(retval(str2, colIndex));
         return compareByOp(unit.val1, unit.val2, unit.operation);
+    }
+    else if (unit.str1 == NULL && unit.str2 != NULL) { // col op str
+        int colIndex = getColIndex(unit.table1, unit.col1);
+        if (colIndex == -1) {
+            printf("Column %s not found in table %s\n", unit.col1, unit.table1);
+            return -1;
+        }
+        if (strcmp(unit.table1, table1) == 0){
+            unit.str1 = retval(str1, colIndex);
+        }
+        else{
+            unit.str1 = retval(str2, colIndex);   
+        }
+        return compareStringByOp(unit.str1, unit.str2, unit.operation);
     }
     else { // col op col
         int colIndex1 = getColIndex(unit.table1, unit.col1);
@@ -233,17 +292,34 @@ int equi_comparator(struct and_entry unit, char *str1, char *str2, char *table1,
             printf("Column %s not found in table %s\n", unit.col2, unit.table2);
             return -1;
         }
-        if (strcmp(unit.table1, table1) == 0)
-            unit.val1 = atoi(retval(str1, colIndex1));
-        else 
-            unit.val1 = atoi(retval(str2, colIndex1));
+        char d1[50];
+        sprintf(d1, "%s", getType(unit.table1, getColIndex(unit.table1, unit.col1)));
+        if (strcmp(d1, "int") == 0) {
+            if (strcmp(unit.table1, table1) == 0)
+                unit.val1 = atoi(retval(str1, colIndex1));
+            else 
+                unit.val1 = atoi(retval(str2, colIndex1));
 
-        if (strcmp(unit.table2, table2) == 0)
-            unit.val2 = atoi(retval(str2, colIndex2));
-        else 
-            unit.val2 = atoi(retval(str1, colIndex2));
+            if (strcmp(unit.table2, table2) == 0)
+                unit.val2 = atoi(retval(str2, colIndex2));
+            else 
+                unit.val2 = atoi(retval(str1, colIndex2));
 
-        return compareByOp(unit.val1, unit.val2, unit.operation);
+            return compareByOp(unit.val1, unit.val2, unit.operation);
+        }
+        else if (strcmp(d1, "str") == 0) {
+            if (strcmp(unit.table1, table1) == 0)
+                unit.str1 = retval(str1, colIndex1);
+            else 
+                unit.str1 = retval(str2, colIndex1);
+
+            if (strcmp(unit.table2, table2) == 0)
+                unit.str2 = retval(str2, colIndex2);
+            else 
+                unit.str2 = retval(str1, colIndex2);
+
+            return compareStringByOp(unit.str1, unit.str2, unit.operation);
+        }
     }
     return -1;    
 }
@@ -262,9 +338,17 @@ int equi_compute_condition(struct or_list condition, char *str1, char *str2, cha
             char str_copy2[1000];
             memset(str_copy2, 0, 1000);
             sprintf(str_copy2, "%s", str2);
-            int ret = equi_comparator(*temp2, str_copy1, str_copy2, table1, table2);
+            int ret;
+            if(temp2->is_cond == 1){
+                ret = equi_compute_condition(*(temp2->nest_condition), str_copy1, str_copy2, table1, table2);
+            } else {
+                ret = equi_comparator(*temp2, str_copy1, str_copy2, table1, table2);
+            }
             if(ret == -1){
                 return -1;
+            }
+            if(temp2->is_cond ==1 && temp2->not_var){
+                ret = ret==0?1:0; 
             }
             val = val & ret;
             temp2 = temp2->next_ptr;
@@ -283,77 +367,108 @@ int associateTable(char *table1, char *table2, struct or_list *conditions) {
     while(temp != NULL) {
         and_entry* temp2 = temp->head;
         while (temp2 != NULL) {
-            if (temp2->int2_fnd) { // col op INT
-                if (temp2->table1 == NULL) {
-                    if (getColIndex(table1, temp2->col1) != -1) temp2->table1 = table1;
-                    else if (getColIndex(table2, temp2->col1) != -1) temp2->table1 = table2;
-                    else {
-                        fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
-                        return -1;
-                    }
-                }
-                else {
-                    if (strcmp(temp2->table1, table1) != 0 && strcmp(temp2->table1, table2) != 0) {
-                        fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
-                        return -1;
-                    }
-                    else if (getColIndex(temp2->table1, temp2->col1) == -1) {
-                        fprintf(stderr, "Column %s does not belong to %s\n", temp2->col1, temp2->table1);
-                        return -1;
-                    }
-                }
-                char d1[50];
-                sprintf(d1, "%s", getType(temp2->table1, getColIndex(temp2->table1, temp2->col1)));
-                if (strcmp(d1, "int") != 0) {
-                    fprintf(stderr, "%s is %s not INT\n", temp2->col1, d1);
-                    return -1;
-                }
+            if (temp2->is_cond == 1) {
+                if (associateTable(table1, table2, temp2->nest_condition) == -1) return -1;
             }
-            else { // col op col
-                if (temp2->table1 == NULL) {
-                    if (getColIndex(table1, temp2->col1) != -1) temp2->table1 = table1;
-                    else if (getColIndex(table2, temp2->col1) != -1) temp2->table1 = table2;
+            else {
+                if (temp2->int2_fnd) { // col op INT
+                    if (temp2->table1 == NULL) {
+                        if (getColIndex(table1, temp2->col1) != -1) temp2->table1 = table1;
+                        else if (getColIndex(table2, temp2->col1) != -1) temp2->table1 = table2;
+                        else {
+                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
+                            return -1;
+                        }
+                    }
                     else {
-                        fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
+                        if (strcmp(temp2->table1, table1) != 0 && strcmp(temp2->table1, table2) != 0) {
+                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
+                            return -1;
+                        }
+                        else if (getColIndex(temp2->table1, temp2->col1) == -1) {
+                            fprintf(stderr, "Column %s does not belong to %s\n", temp2->col1, temp2->table1);
+                            return -1;
+                        }
+                    }
+                    char d1[50];
+                    sprintf(d1, "%s", getType(temp2->table1, getColIndex(temp2->table1, temp2->col1)));
+                    if (strcmp(d1, "int") != 0) {
+                        fprintf(stderr, "%s is %s not INT\n", temp2->col1, d1);
                         return -1;
                     }
                 }
-                else {
-                    if (strcmp(temp2->table1, table1) != 0 && strcmp(temp2->table1, table2) != 0) {
-                        fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
-                        return -1;
+                else if (temp2->str2 != NULL) { // col op str
+                    if (temp2->table1 == NULL) {
+                        if (getColIndex(table1, temp2->col1) != -1) temp2->table1 = table1;
+                        else if (getColIndex(table2, temp2->col1) != -1) temp2->table1 = table2;
+                        else {
+                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
+                            return -1;
+                        }
                     }
-                    else if (getColIndex(temp2->table1, temp2->col1) == -1) {
-                        fprintf(stderr, "Column %s does not belong to %s\n", temp2->col1, temp2->table1);
-                        return -1;
-                    }
-                }
-                if (temp2->table2 == NULL) {
-                    if (getColIndex(table1, temp2->col2) != -1) temp2->table2 = table1;
-                    else if (getColIndex(table2, temp2->col2) != -1) temp2->table2 = table2;
                     else {
-                        fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col2, table1, table2);
+                        if (strcmp(temp2->table1, table1) != 0 && strcmp(temp2->table1, table2) != 0) {
+                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
+                            return -1;
+                        }
+                        else if (getColIndex(temp2->table1, temp2->col1) == -1) {
+                            fprintf(stderr, "Column %s does not belong to %s\n", temp2->col1, temp2->table1);
+                            return -1;
+                        }
+                    }
+                    char d1[50];
+                    sprintf(d1, "%s", getType(temp2->table1, getColIndex(temp2->table1, temp2->col1)));
+                    if (strcmp(d1, "str") != 0) {
+                        fprintf(stderr, "%s is %s not str\n", temp2->col1, d1);
                         return -1;
                     }
                 }
-                else {
-                    if (strcmp(temp2->table2, table1)!=0 && strcmp(temp2->table2, table2) != 0) {
-                        fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col2, table1, table2);
-                        return -1;
+                else { // col op col
+                    if (temp2->table1 == NULL) {
+                        if (getColIndex(table1, temp2->col1) != -1) temp2->table1 = table1;
+                        else if (getColIndex(table2, temp2->col1) != -1) temp2->table1 = table2;
+                        else {
+                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
+                            return -1;
+                        }
                     }
-                    else if (getColIndex(temp2->table2, temp2->col2) == -1) {
-                        fprintf(stderr, "Column %s does not belong to %s\n", temp2->col2, temp2->table2);
+                    else {
+                        if (strcmp(temp2->table1, table1) != 0 && strcmp(temp2->table1, table2) != 0) {
+                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
+                            return -1;
+                        }
+                        else if (getColIndex(temp2->table1, temp2->col1) == -1) {
+                            fprintf(stderr, "Column %s does not belong to %s\n", temp2->col1, temp2->table1);
+                            return -1;
+                        }
+                    }
+                    if (temp2->table2 == NULL) {
+                        if (getColIndex(table1, temp2->col2) != -1) temp2->table2 = table1;
+                        else if (getColIndex(table2, temp2->col2) != -1) temp2->table2 = table2;
+                        else {
+                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col2, table1, table2);
+                            return -1;
+                        }
+                    }
+                    else {
+                        if (strcmp(temp2->table2, table1)!=0 && strcmp(temp2->table2, table2) != 0) {
+                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col2, table1, table2);
+                            return -1;
+                        }
+                        else if (getColIndex(temp2->table2, temp2->col2) == -1) {
+                            fprintf(stderr, "Column %s does not belong to %s\n", temp2->col2, temp2->table2);
+                            return -1;
+                        }
+                    }
+                    char d1[50], d2[50];
+                    sprintf(d1, "%s", getType(temp2->table1, getColIndex(temp2->table1, temp2->col1)));
+                    sprintf(d2, "%s", getType(temp2->table2, getColIndex(temp2->table2, temp2->col2)));
+                    if (strcmp(d1, d2) != 0) {
+                        fprintf(stderr, "Different data type %s %s\n", temp2->col1, temp2->col2);
                         return -1;
                     }
                 }
-                char d1[50], d2[50];
-                sprintf(d1, "%s", getType(temp2->table1, getColIndex(temp2->table1, temp2->col1)));
-                sprintf(d2, "%s", getType(temp2->table2, getColIndex(temp2->table2, temp2->col2)));
-                if (strcmp(d1, d2) != 0) {
-                    fprintf(stderr, "Different data type %s %s\n", temp2->col1, temp2->col2);
-                    return -1;
-                }
-
+                
             }
             temp2 = temp2->next_ptr;
         }

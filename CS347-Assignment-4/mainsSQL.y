@@ -12,8 +12,6 @@ extern int yyleng;
 void yyerror(char* s);
 char list[100][100];
 int vals;
-
-char *ccondition;
 %}
 
 %code requires {
@@ -43,9 +41,10 @@ char *ccondition;
 
 /* declare tokens */
 %token SELECT PROJECT CARTESIAN_PRODUCT EQUI_JOIN
-%token LP RP LA RA EQUAL NOT_EQUAL LE GE DOT COMMA AND OR NOT
+%token AND OR NOT
+%token LP RP LA RA EQUAL NOT_EQUAL LE GE
 %token INT QUOTED_STRING ID
-%token NEWLINE
+%token DOT COMMA NEWLINE
 
 %type <list_of_or> condition
 %type <list_of_and> cond2
@@ -72,7 +71,7 @@ stmt: SELECT LA condition RA LP ID RP
         memset(fname,0,200);
         sprintf(fname,"%s.csv",$6);
         if(checkTableName($6)==0){
-            printf("Table not found!\n");
+            printf("Table %s not found!\n",$6);
         }
         else{
             FILE* file = fopen(fname,"r");
@@ -97,16 +96,12 @@ stmt: SELECT LA condition RA LP ID RP
     }
     | PROJECT LA attr_list RA LP ID RP
     {
-        // printf("no of cols = %d\n", vals);
-        int flag=checkTableName($6);
-        if (flag==0) {
-            printf("Error: no table found\n");
+        if (!checkTableName($6)) {
+            fprintf(stderr, "Table %s not found\n", $6);
         }
         else {
             printColumns(list, vals, $6);
         }
-    
-
     }
     | LP ID RP CARTESIAN_PRODUCT LP ID RP       
     {
@@ -117,15 +112,17 @@ stmt: SELECT LA condition RA LP ID RP
     {
          // check if the two table id's exist
         if (!checkTableName($2)) {
-        fprintf(stderr, "Table %s not present\n", $2);
+            fprintf(stderr, "Table %s not present\n", $2);
         }
-        if (!checkTableName($9)) {
+        else if (!checkTableName($9)) {
             fprintf(stderr, "Table %s not present\n", $9);
         }
-        // check for each condition unit.table1/2 is set and same as above id's, datatype
-        int x = associateTable($2, $9, &($6));
-        if (x == 1) {
-            printEquiJoin($2, $9, &($6));
+        else {
+            // check for each condition unit.table1/2 is set and same as above id's, datatype
+            int x = associateTable($2, $9, &($6));
+            if (x == 1) {
+                printEquiJoin($2, $9, &($6));
+            }
         }
     }
     | %empty
@@ -195,6 +192,9 @@ expr: col op col
         $$.str1 = NULL;
         $$.str2 = NULL;
         $$.next_ptr = NULL;
+        $$.not_var = 0;
+        $$.is_cond = 0;
+        $$.nest_condition = NULL;
     }
     | col op INT 
     {
@@ -212,6 +212,9 @@ expr: col op col
         $$.str1 = NULL;
         $$.str2 = NULL;
         $$.next_ptr = NULL;
+        $$.not_var = 0;
+        $$.is_cond = 0;
+        $$.nest_condition = NULL;
     }
     | INT op col
     {
@@ -221,13 +224,17 @@ expr: col op col
         $$.col1 = NULL;
         $$.col2 = malloc(100);  memset($$.col2, 0, 100); 
         sprintf($$.col2, "%s", $3.col);
-        $$.operation = $2.type;
+        $$.operation = complement($2.type);
+        // $$.operation = $2.type;
         $$.int1_fnd = 1;
         $$.int2_fnd = 0;
         $$.val1 = $1;
         $$.str1 = NULL;
         $$.str2 = NULL;
         $$.next_ptr = NULL;
+        $$.not_var = 0;
+        $$.is_cond = 0;
+        $$.nest_condition = NULL;
     }
     | col op QUOTED_STRING
     {
@@ -244,6 +251,9 @@ expr: col op col
         $$.str2 = malloc(100); memset($$.str2, 0, 100);
         sprintf($$.str2, "%s", $3);
         $$.next_ptr = NULL;
+        $$.is_cond = 0;
+        $$.not_var = 0;
+        $$.nest_condition = NULL;
         // printf("%s %s\n", $$.col1, $$.str1);
     }
     | QUOTED_STRING op col
@@ -261,6 +271,43 @@ expr: col op col
         sprintf($$.str1, "%s", $1);
         $$.str2 = NULL;
         $$.next_ptr = NULL;
+        $$.is_cond = 0;
+        $$.not_var = 0;
+        $$.nest_condition = NULL;
+    }
+    | LP condition RP
+    {   
+        $$.table1 = NULL;
+        $$.table2 = NULL;
+        $$.col1 = NULL;
+        $$.col2 = NULL;
+        $$.operation = 0;
+        $$.int1_fnd = 0;
+        $$.int2_fnd = 0;
+        $$.str1 = NULL;
+        $$.str2 = NULL;
+        $$.next_ptr = NULL;
+        $$.is_cond = 1;
+        $$.not_var = 0;
+        $$.nest_condition = malloc(sizeof(or_list));
+        memcpy($$.nest_condition, &$2, sizeof (or_list));
+    }
+    | NOT LP condition RP
+    {   
+        $$.table1 = NULL;
+        $$.table2 = NULL;
+        $$.col1 = NULL;
+        $$.col2 = NULL;
+        $$.operation = 0;
+        $$.int1_fnd = 0;
+        $$.int2_fnd = 0;
+        $$.str1 = NULL;
+        $$.str2 = NULL;
+        $$.next_ptr = NULL;
+        $$.is_cond = 1;
+        $$.not_var = 1;
+        $$.nest_condition = malloc(sizeof(or_list));
+        memcpy($$.nest_condition, &$3, sizeof (or_list));
     }
 ;
 
@@ -273,12 +320,10 @@ col: ID DOT ID {
         sprintf($$.col, "%s", $3);
     }
     | ID  {
-        // printf("col name ---- : %s\n", $1);
         $$.table = NULL;
         $$.col = malloc(100);
         memset($$.col, 0, 100);
-        sprintf($$.col, "%s", $1);
-        
+        sprintf($$.col, "%s", $1);       
     }
 ;
 
@@ -290,12 +335,11 @@ op: LA {$$.type = 1;}
     | NOT_EQUAL {$$.type = 6;}
 ;
 
-
 attr: ID   {
     $$.name = malloc(100);
     memset($$.name, 0, 100);
     sprintf($$.name, "%s", yytext);
-    printf("column name : %s\n", $$.name);
+    // printf("column name : %s\n", $$.name);
 };
 
 %%

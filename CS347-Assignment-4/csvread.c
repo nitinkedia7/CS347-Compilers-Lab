@@ -43,19 +43,18 @@ void printColumns(char list[100][100], int vals, char* table){
     strcpy(str2,str);
     token = strtok(str, s);
     int j=0;
-    printf("vals %d\n", vals);
     while( token != NULL ) {
         // printf( "%s ", token );
         for(int i=0;i<vals;i++){
             if(strcmp(list[i],token)==0){
                 count++;
                 arr[j]++;
-                break;
             }
         }
         token = strtok(NULL, s);       
         j++;  
     }
+    // printf("vals %d count %d\n", vals, count);
     if(count != vals){
         printf("Error: Column with requested name does not exist\n");
         return;
