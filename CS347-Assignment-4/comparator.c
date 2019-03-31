@@ -1,3 +1,4 @@
+
 #include "comparator.h"
 
 int complement(int op) {
@@ -24,7 +25,7 @@ int complement(int op) {
 int getColIndex(char *table, char *column) { // table already .csv appended
     char tablecopy[200];
     memset(tablecopy,0,200);
-    sprintf(tablecopy,"%s.csv",table);
+    sprintf(tablecopy,"input/%s.csv",table);
     FILE* file = fopen(tablecopy, "r");
     char str[1000];
     char *token;
@@ -61,7 +62,7 @@ char *retval(char *str, int colIndex) {
 char *getType(char *table, int colIndex){
     char tablecopy[200];
     memset(tablecopy,0,200);
-    sprintf(tablecopy,"%s.csv",table);
+    sprintf(tablecopy,"input/%s.csv",table);
     FILE* file = fopen(tablecopy, "r");
     char str[1000];
     char *token;
@@ -220,6 +221,7 @@ int select_comparator(struct and_entry unit, char *str1, char* table_name) {
 
 int select_compute_condition(struct or_list condition, char *str, char* table_name){
     and_list* temp = condition.head;
+    if(temp == NULL) return 1;
     int result = 0;
     
     while(temp!=NULL){
@@ -373,90 +375,106 @@ int associateTable(char *table1, char *table2, struct or_list *conditions) {
             else {
                 if (temp2->int2_fnd) { // col op INT
                     if (temp2->table1 == NULL) {
-                        if (getColIndex(table1, temp2->col1) != -1) temp2->table1 = table1;
+                        if (getColIndex(table1, temp2->col1) != -1 && getColIndex(table2, temp2->col1) != -1) {
+                            fprintf(stdout, "line no.: %d Column %s belongs to both %s and %s\n", yylinenumber, temp2->col1, table1, table2);
+                            return -1;
+                        }
+                        else if (getColIndex(table1, temp2->col1) != -1) temp2->table1 = table1;
                         else if (getColIndex(table2, temp2->col1) != -1) temp2->table1 = table2;
                         else {
-                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
+                            fprintf(stdout, "line no.: %d Column %s does not belong to %s or %s\n", yylinenumber, temp2->col1, table1, table2);
                             return -1;
                         }
                     }
                     else {
                         if (strcmp(temp2->table1, table1) != 0 && strcmp(temp2->table1, table2) != 0) {
-                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
+                            fprintf(stdout, "line no.: %d Column %s does not belong to %s or %s\n", yylinenumber,temp2->col1, table1, table2);
                             return -1;
                         }
                         else if (getColIndex(temp2->table1, temp2->col1) == -1) {
-                            fprintf(stderr, "Column %s does not belong to %s\n", temp2->col1, temp2->table1);
+                            fprintf(stdout, "line no.: %d Column %s does not belong to %s\n",yylinenumber, temp2->col1, temp2->table1);
                             return -1;
                         }
                     }
                     char d1[50];
                     sprintf(d1, "%s", getType(temp2->table1, getColIndex(temp2->table1, temp2->col1)));
                     if (strcmp(d1, "int") != 0) {
-                        fprintf(stderr, "%s is %s not INT\n", temp2->col1, d1);
+                        fprintf(stdout, "line no.: %d %s is %s not INT\n", yylinenumber,temp2->col1, d1);
                         return -1;
                     }
                 }
                 else if (temp2->str2 != NULL) { // col op str
+                    if (getColIndex(table1, temp2->col1) != -1 && getColIndex(table2, temp2->col1) != -1) {
+                        fprintf(stdout, "line no.: %d Column %s belongs to both %s and %s\n", yylinenumber, temp2->col1, table1, table2);
+                        return -1;
+                    }
                     if (temp2->table1 == NULL) {
                         if (getColIndex(table1, temp2->col1) != -1) temp2->table1 = table1;
                         else if (getColIndex(table2, temp2->col1) != -1) temp2->table1 = table2;
                         else {
-                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
+                            fprintf(stdout, "line no.: %d Column %s does not belong to %s or %s\n", yylinenumber,temp2->col1, table1, table2);
                             return -1;
                         }
                     }
                     else {
                         if (strcmp(temp2->table1, table1) != 0 && strcmp(temp2->table1, table2) != 0) {
-                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
+                            fprintf(stdout, "line no.: %d Column %s does not belong to %s or %s\n", yylinenumber,temp2->col1, table1, table2);
                             return -1;
                         }
                         else if (getColIndex(temp2->table1, temp2->col1) == -1) {
-                            fprintf(stderr, "Column %s does not belong to %s\n", temp2->col1, temp2->table1);
+                            fprintf(stdout, "line no.: %d Column %s does not belong to %s\n", yylinenumber,temp2->col1, temp2->table1);
                             return -1;
                         }
                     }
                     char d1[50];
                     sprintf(d1, "%s", getType(temp2->table1, getColIndex(temp2->table1, temp2->col1)));
                     if (strcmp(d1, "str") != 0) {
-                        fprintf(stderr, "%s is %s not str\n", temp2->col1, d1);
+                        fprintf(stdout, "line no.: %d %s is %s not str\n", yylinenumber,temp2->col1, d1);
                         return -1;
                     }
                 }
                 else { // col op col
                     if (temp2->table1 == NULL) {
+                        if (getColIndex(table1, temp2->col1) != -1 && getColIndex(table2, temp2->col1) != -1) {
+                            fprintf(stdout, "line no.: %d Column %s belongs to both %s and %s\n", yylinenumber, temp2->col1, table1, table2);
+                            return -1;
+                        }
                         if (getColIndex(table1, temp2->col1) != -1) temp2->table1 = table1;
                         else if (getColIndex(table2, temp2->col1) != -1) temp2->table1 = table2;
                         else {
-                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
+                            fprintf(stdout, "line no.: %d Column %s does not belong to %s or %s\n", yylinenumber,temp2->col1, table1, table2);
                             return -1;
                         }
                     }
                     else {
                         if (strcmp(temp2->table1, table1) != 0 && strcmp(temp2->table1, table2) != 0) {
-                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col1, table1, table2);
+                            fprintf(stdout, "line no.: %d Column %s does not belong to %s or %s\n", yylinenumber,temp2->col1, table1, table2);
                             return -1;
                         }
                         else if (getColIndex(temp2->table1, temp2->col1) == -1) {
-                            fprintf(stderr, "Column %s does not belong to %s\n", temp2->col1, temp2->table1);
+                            fprintf(stdout, "line no.: %d Column %s does not belong to %s\n", yylinenumber,temp2->col1, temp2->table1);
                             return -1;
                         }
                     }
                     if (temp2->table2 == NULL) {
+                        if (getColIndex(table1, temp2->col1) != -1 && getColIndex(table2, temp2->col1) != -1) {
+                            fprintf(stdout, "line no.: %d Column %s belongs to both %s and %s\n", yylinenumber, temp2->col1, table1, table2);
+                            return -1;
+                        }
                         if (getColIndex(table1, temp2->col2) != -1) temp2->table2 = table1;
                         else if (getColIndex(table2, temp2->col2) != -1) temp2->table2 = table2;
                         else {
-                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col2, table1, table2);
+                            fprintf(stdout, "line no.: %d Column %s does not belong to %s or %s\n", yylinenumber,temp2->col2, table1, table2);
                             return -1;
                         }
                     }
                     else {
                         if (strcmp(temp2->table2, table1)!=0 && strcmp(temp2->table2, table2) != 0) {
-                            fprintf(stderr, "Column %s does not belong to %s or %s\n", temp2->col2, table1, table2);
+                            fprintf(stdout, "line no.: %d Column %s does not belong to %s or %s\n", yylinenumber,temp2->col2, table1, table2);
                             return -1;
                         }
                         else if (getColIndex(temp2->table2, temp2->col2) == -1) {
-                            fprintf(stderr, "Column %s does not belong to %s\n", temp2->col2, temp2->table2);
+                            fprintf(stdout, "line no.: %d Column %s does not belong to %s\n", yylinenumber,temp2->col2, temp2->table2);
                             return -1;
                         }
                     }
@@ -464,7 +482,7 @@ int associateTable(char *table1, char *table2, struct or_list *conditions) {
                     sprintf(d1, "%s", getType(temp2->table1, getColIndex(temp2->table1, temp2->col1)));
                     sprintf(d2, "%s", getType(temp2->table2, getColIndex(temp2->table2, temp2->col2)));
                     if (strcmp(d1, d2) != 0) {
-                        fprintf(stderr, "Different data type %s %s\n", temp2->col1, temp2->col2);
+                        fprintf(stdout, "line no.: %d Different data type %s %s\n", yylinenumber,temp2->col1, temp2->col2);
                         return -1;
                     }
                 }
@@ -477,13 +495,13 @@ int associateTable(char *table1, char *table2, struct or_list *conditions) {
     return 1;
 }
 
-void printEquiJoin(char *table1, char *table2, struct or_list *conditions) {
+int printEquiJoin(char *table1, char *table2, struct or_list *conditions) {
     char table1Name[200];
     memset(table1Name, 0, 200);
-    sprintf(table1Name, "%s.csv", table1);
+    sprintf(table1Name, "input/%s.csv", table1);
     char table2Name[200];
     memset(table2Name, 0, 200);
-    sprintf(table2Name, "%s.csv", table2);
+    sprintf(table2Name, "input/%s.csv", table2);
 
     FILE* file1 = fopen(table1Name,"r");
     FILE* file2 = fopen(table2Name,"r");
@@ -512,6 +530,7 @@ void printEquiJoin(char *table1, char *table2, struct or_list *conditions) {
     // printf("%s", str1);
     // printf(",%s", str2);
     fclose(file2);
+    int numOfRecords = 0;
     while(fgets(str1, 1000, file1)) {
         sscanf(str1, "%[^\n]s", str1);
 
@@ -522,9 +541,11 @@ void printEquiJoin(char *table1, char *table2, struct or_list *conditions) {
             if (equi_compute_condition(*conditions, str1, str2, table1, table2)) {
                 printf("%s", str1);
                 printf(",%s", str2);
+                numOfRecords++;
             };
         } 
         fclose(file2);     
     }
     fclose(file1);
+    return numOfRecords;
 }

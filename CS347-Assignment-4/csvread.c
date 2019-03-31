@@ -3,7 +3,7 @@
 #include <string.h>
 
 int checkTableName(char* tablename){
-    FILE* file = fopen("tablenames.txt","r");
+    FILE* file = fopen("input/tablenames.txt","r");
     char str[1000];
     const char s[2] = ",";
     fgets(str, 1000, file);
@@ -28,7 +28,7 @@ int checkTableName(char* tablename){
 void printColumns(char list[100][100], int vals, char* table){
     char tableName[100];
     memset(tableName, 0, 100);
-    sprintf(tableName, "%s.csv", table);
+    sprintf(tableName, "input/%s.csv", table);
 
     FILE* file = fopen(tableName,"r");
     char str[1000];
@@ -69,11 +69,13 @@ void printColumns(char list[100][100], int vals, char* table){
         j++;  
     }
     printf("\n");
+    int numOfRecords = 0;
     fgets(str, 1000, file);
     while(fgets(str, 1000, file)){
         int j=0;
         char *token;
         sscanf(str, "%[^\n]s", str);
+        numOfRecords++;
         token = strtok(str, s);
         while( token != NULL ) {
             if(arr[j]){
@@ -84,24 +86,25 @@ void printColumns(char list[100][100], int vals, char* table){
         }
         printf("\n");
     }
+    printf("Number of Records found : %d\n", numOfRecords);
     fclose(file);
 }
 
 void printCartesianProducts(char *table1, char *table2) {
     char table1Name[200];
     memset(table1Name, 0, 200);
-    sprintf(table1Name, "%s.csv", table1);
+    sprintf(table1Name, "input/%s.csv", table1);
     char table2Name[200];
     memset(table2Name, 0, 200);
-    sprintf(table2Name, "%s.csv", table2);
+    sprintf(table2Name, "input/%s.csv", table2);
     int a = checkTableName(table1);
     int b = checkTableName(table2);
     if (a == 0) {
-        fprintf(stderr, "Table %s not present\n", table1Name);
+        fprintf(stderr, "Table %s not present\n", table1);
         return;
     }
     else if (b == 0) {
-        fprintf(stderr, "Table %s not present\n", table2Name);
+        fprintf(stderr, "Table %s not present\n", table2);
         return;
     }
     // both files present
@@ -132,16 +135,20 @@ void printCartesianProducts(char *table1, char *table2) {
     // printf("%s", str1);
     // printf(",%s", str2);
     fclose(file2);
+    int numOfRecords = 0;
     while(fgets(str1, 1000, file1)) {
         sscanf(str1, "%[^\n]s", str1);
         file2 = fopen(table2Name,"r");
         fgets(str2, 1000, file2);
         fgets(str2, 1000, file2);
+        
         while (fgets(str2, 1000, file2)) {
             printf("%s", str1);
             printf(",%s", str2);
+            numOfRecords++;
         } 
         fclose(file2);     
     }
+    printf("Number of Records found : %d\n", numOfRecords);
     fclose(file1);
 }
