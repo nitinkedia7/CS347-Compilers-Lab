@@ -19,6 +19,7 @@ SELECT <id<=3 AND dept_id>=1 OR id>3 AND dept_id>=1> (student)
 SELECT <(id<=3 AND dept_id>=1) OR (id>3 AND dept_id>=1)> (student)
 SELECT <(id<=3 AND dept_id>=1) OR (id>3 AND dept_id<3)> (student)
 SELECT <name<'Ram'> (student)
+SELECT <(A>=22 OR salary > 200 AND (C > 50 AND (D='fff' OR D='eef') OR D<='eee'))> (test)
 
 (foo) EQUI_JOIN< foo.oof = bar.rab > (bar)
 (foo) EQUI_JOIN< foo.oof = student.id > (student)
@@ -37,4 +38,24 @@ SELECT <name<'Ram'> (student)
 (student) EQUI_JOIN <student.id=enroll.student_id AND student.name='NitinKedia'> (enroll)
 (student) EQUI_JOIN <student.id=enroll.student_id AND student.name='NitinKedia' OR name='Ram'> (enroll)
 (student) EQUI_JOIN <student.name='NitinKedia'> (enroll)
- 
+(student) EQUI_JOIN <'Shyam'=student.name> (enroll)
+(student) EQUI_JOIN <student.name!=student2.name> (student2)
+(student) EQUI_JOIN <NOT (student.name=student2.name)> (student2)
+
+(student) EQUI_JOIN <> (student2)
+
+(student2) CARTESIAN_PRODUCT (enroll2)
+(st) CARTESIAN_PRODUCT (student)
+(enroll2) (enroll2) CARTESIAN_PRODUCT (student2)
+
+
+PROJECT <A,salary, salary, C, D> (test)
+PROJECT <A, C, D> (test)
+PROJECT <salary, salary, C, D> (test)
+PROJECT <A,salary, salary, C, D> (enroll)
+PROJECT <A,salary, salary, C, D> (student)
+PROJECT <A,salary, salary, C, D> (test)
+PROJECT <D> (test)
+PROJECT <Name, Roll, Dept> (bhosdike)
+PROJECT <Roll> (test3)
+PROJECT <Dept> (test3)

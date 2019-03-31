@@ -1,8 +1,8 @@
 id,name,dept_id
 int,str,int
-1,NitinKedia,1
-2,SahibKhan,1
-3,PantRohitRakesh,1
-4,Ram,1
-5,Shyam,3
-6,Shivam,2
+1,'NitinKedia',1
+2,'SahibKhan',1
+3,'PantRohitRakesh',1
+4,'Ram',1
+5,'Shyam',3
+6,'Shivam',2
