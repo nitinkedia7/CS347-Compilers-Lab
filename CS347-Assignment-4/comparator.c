@@ -133,6 +133,10 @@ int compareStringByOp(char *str1, char *str2, int op){
  
 int select_comparator(struct and_entry unit, char *str1, char* table_name) {
     if (unit.int1_fnd) {
+        if(unit.table2 != NULL && strcmp(unit.table2, table_name)!=0){
+            printf("Associated table name %s not correct. Actual table name : %s\n", unit.table2, table_name);
+            return -1;
+        }
         int colIndex = getColIndex(table_name, unit.col2);
         if (colIndex == -1) {
             printf("Column %s not found in table %s\n", unit.col2, table_name);
@@ -148,6 +152,10 @@ int select_comparator(struct and_entry unit, char *str1, char* table_name) {
     }
     else if (unit.int2_fnd) { // col op INT
         // printf("I'm %s %s here\n", table_name, unit.col1);
+        if(unit.table1 != NULL && strcmp(unit.table1, table_name)!=0){
+            printf("Associated table name %s not correct. Actual table name : %s\n", unit.table1, table_name);
+            return -1;
+        }
         int colIndex = getColIndex(table_name, unit.col1);
         if (colIndex == -1) {
             printf("Column %s not found in table %s\n", unit.col1, table_name);
@@ -163,6 +171,10 @@ int select_comparator(struct and_entry unit, char *str1, char* table_name) {
     }
     else if(unit.str1 == NULL && unit.str2!=NULL){
         // printf("I'm %s %s here\n", table_name, unit.str2);
+        if(unit.table1 != NULL && strcmp(unit.table1, table_name)!=0){
+            printf("Associated table name %s not correct. Actual table name : %s\n", unit.table1, table_name);
+            return -1;
+        }
         int colIndex = getColIndex(table_name, unit.col1);
         if (colIndex == -1) {
             printf("Column %s not found in table %s\n", unit.col1, table_name);
@@ -177,6 +189,10 @@ int select_comparator(struct and_entry unit, char *str1, char* table_name) {
         return compareStringByOp(unit.str1, unit.str2, unit.operation);
     }
     else if(unit.str1 != NULL && unit.str2==NULL){
+        if(unit.table2 != NULL && strcmp(unit.table2, table_name)!=0){
+            printf("Associated table name %s not correct. Actual table name : %s\n", unit.table2, table_name);
+            return -1;
+        }
         int colIndex = getColIndex(table_name, unit.col2);
         if (colIndex == -1) {
             printf("Column %s not found in table %s\n", unit.col2, table_name);
@@ -191,6 +207,14 @@ int select_comparator(struct and_entry unit, char *str1, char* table_name) {
         return compareStringByOp(unit.str1, unit.str2, unit.operation);
     }
     else {
+        if(unit.table2 != NULL && strcmp(unit.table2, table_name)!=0){
+            printf("Associated table name %s not correct. Actual table name : %s\n", unit.table2, table_name);
+            return -1;
+        }
+        if(unit.table1 != NULL && strcmp(unit.table1, table_name)!=0){
+            printf("Associated table name %s not correct. Actual table name : %s\n", unit.table1, table_name);
+            return -1;
+        }
         int colIndex1 = getColIndex(table_name, unit.col1);
         int colIndex2 = getColIndex(table_name, unit.col2);
         if (colIndex1 == -1) {

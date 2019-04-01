@@ -1,0 +1,12 @@
+eid,name
+int,str
+1,'ComputerScienceAndEngineering'
+2,'Maths&Computing'
+3,'ElectricalEngineering'
+4,'BioTech'
+5,'Civil'
+6,'Mechanical'
+7,'Design'
+8,'Humanity'
+9,'Chemical'
+10,'Physics'
