@@ -59,3 +59,17 @@ PROJECT <D> (test)
 PROJECT <Name, Roll, Dept> (bhosdike)
 PROJECT <Roll> (test3)
 PROJECT <Dept> (test3)
+
+SELECT <Name='John' AND salary>2000> (Employee)
+SELECT <Salary<200> (Employee)
+SELECT <Name='John'> (Employee)
+SELECT <Name='John' OR Name='John'> (Employee)
+SELECT <NOT(Name>='John')> (Employee)
+SELECT <(Name='John')> (Employee)
+SELECT <(Name=1)> (Employee)
+SELECT <()> (Department)
+
+SELECT (Employee) <(Name='Jill')>
+SELECT <(Name='John' OR Name='Jill') AND Salary!=30> (Employee)
+SELECT <(Name='John' AND id=1 OR Salary=100)> (Employee)
+SELECT <(Name='John' AND (id=1 OR Salary=100))> (Employee)
