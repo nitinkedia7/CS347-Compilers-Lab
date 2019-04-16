@@ -7,3 +7,5 @@ Pipfile
 lex.yy.c
 *.tab.c
 *.tab.h
+reference/
+CS347-Assignment-3/oreilly/
