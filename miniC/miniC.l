@@ -56,9 +56,9 @@
 "*"                             { printf("<%s>", yytext);return MUL; }
 "%"                             { printf("<%s>", yytext);return MOD; }
 
-[0-9]+\.[0-9]*                  { printf("<%s>", yytext);return NUMFLOAT; }
-[0-9]+                          { printf("<%s>", yytext);return NUMINT; }
-[a-zA-Z_][a-zA-Z_0-9]*          { printf("<%s>", yytext);return id; }
+[0-9]+\.[0-9]*                  { yylval.intval = atoi(yytext); printf("<%s>", yytext);return NUMFLOAT; }
+[0-9]+                          { yylval.floatval = atof(yytext); printf("<%s>", yytext);return NUMINT; }
+[a-zA-Z_][a-zA-Z_0-9]*          { yylval.text = malloc(128); memset(yylval.text, 0, 128) ; printf("<%s>", yytext);return ID; }
 
 \n                              { printf("\n");yylineno++;}
 [ \t]                           {/* ignore whitespace */ }

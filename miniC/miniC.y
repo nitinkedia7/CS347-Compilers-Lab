@@ -9,17 +9,41 @@ extern char* yytext;
 extern int yyleng;
 void yyerror(char* s);
 
-%}
+int scope;
+%} 
 
-%token INT FLOAT VOID NUMFLOAT NUMINT id NEWLINE
+%code requires {
+    #include "functab.h"
+}
+
+%union {
+    int intval;
+    float floatval;
+    char *text;
+    /* Each linkedList node conatins a struct of type (void *) */
+    linkedList *dimlist;
+    linkedList *typerecList;
+    typerec* varRec;
+    funcEntry* funcEntryRec;
+}
+
+%token INT FLOAT VOID NUMFLOAT NUMINT ID NEWLINE
 %token COLON QUESTION DOT LCB RCB LSB RSB LP RP SEMI COMMA ASSIGN
 %token IF ELSE CASE BREAK DEFAULT CONTINUE WHILE FOR RETURN SWITCH MAIN
 %token NOT AND OR LT GT LE GE EQUAL NOTEQUAL LSHIFT RSHIFT PLUSASG MINASG MULASG MODASG DIVASG INCREMENT DECREMENT XOR BITAND BITOR PLUS MINUS DIV MUL MOD
 
+%type <floatval> NUMFLOAT
+%type <intval> NUMINT T
+%type <text> ID
+%type <typerecList> L
+%type <varRec> ID_ARR DEC_ID_ARR 
+%type <dimlist> BR_DIMLIST
+%type <funcEntryRec> FUN
+
 %%
 
 MAIN_PROG: PROG MAINFUNCTION
-        | MAINFUNCTION
+    | MAINFUNCTION
 ;
 
 PROG: PROG FUNC_DEF
@@ -30,12 +54,17 @@ MAINFUNCTION: INT MAIN LP RP LCB BODY RCB
 ;
 
 FUNC_DEF: FUNC_HEAD LCB BODY RCB
+        {
+            $$ = (func_name_table*)malloc(sizeof(func_name_table));
+            $$->name = $1->name;
+            $$->parameter_ptr = $1->parameter_ptr;
+        }
 ;
 
 FUNC_HEAD: RES_ID LP DECL_PLIST RP
 ;
 
-RES_ID: RESULT id   
+RES_ID: RESULT ID   
 ;
 
 RESULT: INT
@@ -51,7 +80,7 @@ DECL_PL: DECL_PL COMMA DECL_PARAM
     | DECL_PARAM
 ;
 
-DECL_PARAM: T id
+DECL_PARAM: T ID
 ;
 
 BODY: STMT_LIST
@@ -78,31 +107,96 @@ STMT: VAR_DECL
 VAR_DECL: D SEMI 
 ;
 
-D: T L 
+D: T L  { 
+            // patchDataType($1, $2, scope); 
+            // insertSymTab($2);
+            // $2.clear();
+        }
 ;
 
-T:  INT
-    | FLOAT
+T:  INT         { $$ = INTEGER; }
+    | FLOAT     { $$ = FLOATING; }
 ;    
 
 L: DEC_ID_ARR
-    | L COMMA DEC_ID_ARR
+    {  
+        $$ = createList();
+        push_back($$, $1, sizeof(typerec));
+    }
+    | L COMMA DEC_ID_ARR    
+    { 
+        push_back($$, $3, sizeof(typerec) ) ;
+        $$ = $1;
+    }
 ;
 
-DEC_ID_ARR: id 
-    | id ASSIGN CONDITION1
-    | id BR_DIMLIST
+DEC_ID_ARR: ID
+    {   
+        // search_var($1, active_func_ptr, scope, found, vn);
+        $$ = createTyperec();
+        $$->name = $1;
+        $$->type = SIMPLE;
+        // $$->eletype to be patched
+        $$->tag = VARIABLE;
+        $$->scope = scope;
+    }
+    | ID ASSIGN CONDITION1
+    {
+        
+        // $$.name = $1;
+        // $$.type = SIMPLE;
+        // $$.eletype to be patched
+        // $$.tag = VARIABLE;
+        // $$.scope = scope;
+    }
+    | ID BR_DIMLIST
+    {
+        $$ = createTyperec();
+        $$->name = $1;
+        $$->type = ARRAY;
+        $$->tag = VARIABLE;
+        $$->scope = scope;
+        $$->dimlist = $2;
+    }
 ;
 
-ID_ARR: id 
-    | id BR_DIMLIST
+ID_ARR: ID
+    {   
+        $$ = (typerec*)malloc(sizeof(typerec));
+        $$->name = $1;
+        $$->type = SIMPLE;
+        // $$->eletype to be patched
+        $$->tag = VARIABLE;
+        $$->scope = scope;
+    }
+    | ID BR_DIMLIST
+    {
+        $$ = (typerec*)malloc(sizeof(typerec));
+        $$->name = $1;
+        $$->type = ARRAY;
+        // $$->eletype to be patched
+        $$->tag = VARIABLE;
+        $$->scope = scope;
+    }
 ;
 
 BR_DIMLIST: LSB NUMINT RSB
+    {
+        $$ = createList();
+        push_back($$, &$2, sizeof(int));
+    }
     | BR_DIMLIST LSB NUMINT RSB 
+    {
+        $$ = $1; // preserve order
+        push_back($$, &$3, sizeof(int));
+        // $1.clear();
+    }
 ;
 
-FUNC_CALL: id LP PARAMLIST RP SEMI
+FUNC_CALL: ID LP PARAMLIST RP SEMI
+        {
+            
+        }
 ;
 
 PARAMLIST: PLIST 
@@ -133,7 +227,10 @@ CASELIST:   CASE CONDITION1 COLON BODY CASELIST
     | DEFAULT COLON BODY
 ;
 
-FORLOOP: FOR LP ASG1 SEMI ASG1 SEMI ASG1 RP LCB BODY RCB
+FORLOOP: FOREXP LCB BODY RCB
+;
+
+FOREXP: FOR LP ASG1 SEMI ASG1 SEMI ASG1 RP
 ;
 
 ASG1: ASG
@@ -141,8 +238,7 @@ ASG1: ASG
 ;
 
 IFSTMT: IFEXP LCB BODY RCB
-        | IFEXP LCB BODY RCB ELSE LCB BODY RCB
-        | IFEXP LCB BODY RCB ELSE IFEXP LCB BODY RCB
+    | IFEXP LCB BODY RCB ELSE LCB BODY RCB
 ;
 
 IFEXP: IF LP ASG RP 
@@ -205,5 +301,6 @@ void yyerror(char *s)
 
 int main(int argc, char **argv)
 {
-  yyparse();
+    scope=0;
+    yyparse();
 }
