@@ -2,7 +2,7 @@
 #include <bits/stdc++.h>
 using namespace std;
 
-enum eletype {INTEGER, FLOATING, NULLVOID};
+enum eletype {INTEGER, FLOATING, NULLVOID, BOOLEAN};
 enum type {SIMPLE, ARRAY};
 enum tag{PARAMAETER, VARIABLE};
 
@@ -29,7 +29,9 @@ void insertParamTab(vector<typeRecord*> &typeRecordList, funcEntry* activeFuncPt
 void deleteVarList(funcEntry* activeFuncPtr, int scope);
 void searchFunc(funcEntry* activeFuncPtr,vector<funcEntry*> &funcEntryRecord,int &found);
 void searchVariable(string name, funcEntry* activeFuncPtr, int &found, typeRecord *&vn);
-void searchParam(string name, vector<typeRecord*> &parameterList, int &found);
+void searchParam(string name, vector<typeRecord*> &parameterList, int &found, typeRecord *&pn);
 void addFunction(funcEntry* activeFuncPtr, vector<funcEntry*> &funcEntryRecord);
 void printList(vector<funcEntry*> &funcEntryRecord);
 void printFunction(funcEntry* &activeFuncPtr);
+bool arithmeticCompatible(int type1, int type2);
+int compareTypes(int type1, int type2);

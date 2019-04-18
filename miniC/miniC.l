@@ -56,8 +56,8 @@
 "*"                             { printf("<%s>", yytext);return MUL; }
 "%"                             { printf("<%s>", yytext);return MOD; }
 
-[0-9]+\.[0-9]*                  { yylval.floatval = atof(yytext); printf("<%s>", yytext);return NUMFLOAT; }
-[0-9]+                          { yylval.intval = atoi(yytext); printf("<%s>", yytext);return NUMINT; }
+[0-9]+\.[0-9]*                  { yylval.idName = (char *)malloc(100); memset(yylval.idName, 0, 100); memcpy(yylval.idName, yytext, yyleng); printf("<%s>", yytext); return NUMFLOAT; }
+[0-9]+                          { yylval.idName = (char *)malloc(100); memset(yylval.idName, 0, 100); memcpy(yylval.idName, yytext, yyleng); printf("<%s>", yytext); return NUMINT; }
 [a-zA-Z_][a-zA-Z_0-9]*          { yylval.idName = (char *)malloc(100); memset(yylval.idName, 0, 100); memcpy(yylval.idName, yytext, yyleng); printf("<%s>", yytext);return ID; }
 
 \n                              { printf("\n");yylineno++;}

@@ -28,6 +28,10 @@ int found;
     int intval;
     float floatval;
     char *idName;
+
+    struct expression {
+        int type;
+    };
 }
 
 %token INT FLOAT VOID NUMFLOAT NUMINT ID NEWLINE
@@ -36,9 +40,10 @@ int found;
 %token LSHIFT RSHIFT PLUSASG MINASG MULASG MODASG DIVASG INCREMENT DECREMENT XOR BITAND BITOR PLUS MINUS DIV MUL MOD
 %token NOT AND OR LT GT LE GE EQUAL NOTEQUAL
 
-%type <floatval> NUMFLOAT
-%type <intval> NUMINT
+%type <idName> NUMFLOAT
+%type <idName> NUMINT
 %type <idName> ID
+%type <expression> EXPR2 EXPR21 TERM FACTOR ID_ARR ASG ASG1
 
 %%
 
@@ -212,7 +217,8 @@ DEC_ID_ARR: ID
             printf("Variable %s already declared at same level %d\n", $1, scope);
         }
         else if (scope == 2) {
-            searchParam(string($1), activeFuncPtr->parameterList, found);
+            typeRecord* pn = NULL;
+            searchParam(string($1), activeFuncPtr->parameterList, found , pn);
             if (found) {
                 printf("Parameter with name %s exists %d\n", $1, scope);
             } 
@@ -237,7 +243,7 @@ DEC_ID_ARR: ID
             typeRecordList.push_back(varRecord);
         }
     }
-    | ID ASSIGN CONDITION1
+    | ID ASSIGN ASG
     | ID BR_DIMLIST
     {  
         int found = 0;
@@ -247,7 +253,8 @@ DEC_ID_ARR: ID
             printf("Variable %s already declared at same level %d\n", $1, scope);
         }
         else if (scope == 2) {
-            searchParam(string($1), activeFuncPtr->parameterList, found);
+            typeRecord* pn = NULL;
+            searchParam(string($1), activeFuncPtr->parameterList, found, pn);
             if (found) {
                 printf("Parameter with name %s exists %d\n", $1, scope);
             } 
@@ -354,50 +361,236 @@ EXPR1: NOT EXPR21
 ;
 
 EXPR21: EXPR2 EQUAL EXPR2
+    {
+        if ($1.type == NULLVOID || $3.type == NULLVOID) {
+            $$.type = NULLVOID;
+        }
+        else {
+            $$.type = BOOLEAN;
+        }   
+    }
     | EXPR2 NOTEQUAL EXPR2
+    {
+        if($1.type == NULLVOID || $3.type == NULLVOID){
+            $$.type = NULLVOID;
+        }
+        else{
+            $$.type = BOOLEAN;
+        }   
+    }
     | EXPR2 LT EXPR2 
+    {
+        if($1.type == NULLVOID || $3.type == NULLVOID){
+            $$.type = NULLVOID;
+        }
+        else{
+            $$.type = BOOLEAN;
+        }   
+    }
     | EXPR2 GT EXPR2
+    {
+        if($1.type == NULLVOID || $3.type == NULLVOID){
+            $$.type = NULLVOID;
+        }
+        else{
+            $$.type = BOOLEAN;
+        }   
+    }
     | EXPR2 LE EXPR2
+    {
+        if($1.type == NULLVOID || $3.type == NULLVOID){
+            $$.type = NULLVOID;
+        }
+        else{
+            $$.type = BOOLEAN;
+        }   
+    }
     | EXPR2 GE EXPR2
-    | ID_ARR INCREMENT 
+    {
+        if($1.type == NULLVOID || $3.type == NULLVOID){
+            $$.type = NULLVOID;
+        }
+        else{
+            $$.type = BOOLEAN;
+        }   
+    }
+    | ID_ARR INCREMENT
+    {
+        if ($1.type == INTEGER) {
+            $$.type = INTEGER;      
+        }
+        else {
+            $$.type = NULLVOID;
+            cout << "Cannot increment non-integer type variable" << endl; 
+        }
+    } 
     | ID_ARR DECREMENT
+    {
+        if ($1.type == INTEGER) {
+            $$.type = INTEGER;      
+        }
+        else {
+            $$.type = NULLVOID;
+            cout << "Cannot increment non-integer type variable" << endl; 
+        }
+    } 
     | INCREMENT ID_ARR
+    {
+        if ($1.type == INTEGER) {
+            $$.type = INTEGER;      
+        }
+        else {
+            $$.type = NULLVOID;
+            cout << "Cannot increment non-integer type variable" << endl; 
+        }
+    } 
     | DECREMENT ID_ARR
-    | EXPR2
+    {
+        if ($1.type == INTEGER) {
+            $$.type = INTEGER;      
+        }
+        else {
+            $$.type = NULLVOID;
+            cout << "Cannot increment non-integer type variable" << endl; 
+        }
+    } 
+    | EXPR2 { $$.type = $1.type; }
 ;
 
 EXPR2:  EXPR2 PLUS TERM
+    {
+        if ($1.type == NULLVOID || $3.type == NULLVOID) {
+          $$.type = NULLVOID;  
+        }
+        else {
+            if (arithCompatible($1.type, $3.type)) {
+                $$.type = compareTypes($1.type,$3.type);
+            }
+            else {
+                cout << "Type mismatch in expression" << endl;
+                $$.type = NULLVOID;
+            }
+        } 
+    }
     | EXPR2 MINUS TERM
-    | TERM
+    {
+        if ($1.type == NULLVOID || $3.type == NULLVOID) {
+          $$.type = NULLVOID;  
+        }
+        else {
+            if (arithCompatible($1.type, $3.type)) {
+                $$.type = compareTypes($1.type,$3.type);
+            }
+            else {
+                cout << "Type mismatch in expression" << endl;
+                $$.type = NULLVOID;
+            }
+        } 
+    }
+    | TERM { $$.type = $1.type; }
 ;
 
 TERM: TERM MUL FACTOR
-    | TERM DIV FACTOR   
-    | FACTOR
+    {
+        if ($1.type == NULLVOID || $3.type == NULLVOID) {
+          $$.type = NULLVOID;  
+        }
+        else {
+            if (arithCompatible($1.type, $3.type)) {
+                $$.type = compareTypes($1.type,$3.type);
+            }
+            else {
+                cout << "Type mismatch in expression" << endl;
+                $$.type = NULLVOID;
+            }
+        }       
+    }
+    | TERM DIV FACTOR  
+    {
+        if ($1.type == NULLVOID || $3.type == NULLVOID) {
+          $$.type = NULLVOID;  
+        }
+        else {
+            if (arithCompatible($1.type, $3.type)) {
+                $$.type = compareTypes($1.type,$3.type);
+            }
+            else {
+                cout << "Type mismatch in expression" << endl;
+                $$.type = NULLVOID;
+            }
+        }   
+    } 
+    | FACTOR { $$.type = $1.type; }
 ;
 
-FACTOR: ID_ARR
-    | NUMINT
-    | NUMFLOAT
-    | FUNC_CALL
-    | LP ASG RP
+FACTOR: ID_ARR  { $$.type = $1.type; }
+    | NUMINT    { $$.type = INTEGER; }
+    | NUMFLOAT  { $$.type = FLOATING; }
+    | FUNC_CALL { $$.type = callFuncPtr->returnType; }
+    | LP ASG RP { $$.type = $2.type; } 
 ;
 
 ID_ARR: ID
     {   
         // retrieve the highest level id with same name in param list or var list
-
-        // int found = 0;
-        // typeRecord* vn = NULL;
-        // searchVariable(string($1), activeFuncPtr->variableList, found, vn); 
-        // if(found == 0){
-        //     searchParam(string)
-        // }
-        
+        int found = 0;
+        typeRecord* vn = NULL;
+        searchVariable(string($1), activeFuncPtr->variableList, found, vn); 
+        if(found){
+            if (vn->type == SIMPLE) {
+                $$.type = vn->eleType;
+                // ID_ARR.val = Id.val used for code generation
+            }
+            else {
+                cout << $1 << " is declared as an array" << endl; 
+            }
+        }
+        else {
+            searchParam(string ($1), activeFuncPtr->parameterList, found, vn);
+            if (found) {
+                if (vn->type == SIMPLE) {
+                    $$.type = vn->eleType;
+                    // ID_ARR.val = Id.val used for code generation
+                }
+                else {
+                    cout << $1 << " is declared as an array" << endl;
+                }
+            }
+            else {
+                cout << "Undeclared identifier " << $1 << endl;
+            }
+        }
     }
     | ID BR_DIMLIST
     {
-
+        // retrieve the highest level id with same name in param list or var list
+        int found = 0;
+        typeRecord* vn = NULL;
+        searchVariable(string($1), activeFuncPtr->variableList, found, vn); 
+        if(found){
+            if (vn->type == ARRAY) {
+                $$.type = vn->eleType;
+                // ID_ARR.val = Id.val used for code generation
+            }
+            else {
+                cout << $1 << " is declared as a singleton" << endl; 
+            }
+        }
+        else {
+            searchParam(string ($1), activeFuncPtr->parameterList, found, vn);
+            if (found) {
+                if (vn->type == ARRAY) {
+                    $$.type = vn->eleType;
+                    // ID_ARR.val = Id.val used for code generation
+                }
+                else {
+                    cout << $1 << " is declared as a singleton" << endl;
+                }
+            }
+            else {
+                cout << "Undeclared identifier " << $1 << endl;
+            }
+        }
     }
 ;
 

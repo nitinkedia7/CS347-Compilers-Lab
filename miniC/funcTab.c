@@ -44,26 +44,34 @@ void searchVariable(string name, funcEntry* activeFuncPtr, int &found, typeRecor
     return;
 }
 
-void searchParam(string name, vector<typeRecord*> &parameterList, int &found) {
+void searchParam(string name, vector<typeRecord*> &parameterList, int &found, typeRecord *&pn) {
     vector<typeRecord*> :: reverse_iterator i;
     for (i = parameterList.rbegin(); i != parameterList.rend(); ++i){
         if(name == (*i)->name){
             found = 1;
+            pn = (*i);
             return;
-        }
-        else {
-            
         }
     }
     found = 0;
+    pn = NULL;
     return;
 }
 
 void searchFunc(funcEntry* activeFuncPtr, vector<funcEntry*> &funcEntryRecord, int &found){
     for(auto it:funcEntryRecord){
         if(it->name == activeFuncPtr->name && it->returnType == activeFuncPtr->returnType && it->numOfParam == activeFuncPtr->numOfParam){
-            found=1;
-            return;
+            int flag=1;
+            for(int i=0;i<it->numOfParam;i++){
+                if((it->parameterList[i])->eleType != activeFuncPtr->parameterList[i]->eleType){
+                     flag=0;
+                     break;
+                }
+            }
+            if(flag == 1){
+                found=1;
+                return;
+            } 
         }
     }
     found=0;
@@ -101,3 +109,26 @@ void printFunction(funcEntry* &activeFuncPtr){
 void addFunction(funcEntry* activeFuncPtr, vector<funcEntry*> &funcEntryRecord){
     funcEntryRecord.push_back(activeFuncPtr);
 }
+
+bool arithmeticCompatible(int type1, int type2) {
+    if ((type1 == INTEGER || type1 == FLOATING)
+        && (type2 == INTEGER || type2 == FLOATING)) return true;
+    return false;
+}
+
+int compareTypes(int type1, int type2) {
+    if (type1 == INTEGER && type2 == INTEGER) {
+        return INTEGER;
+    }
+    else if (type1 == FLOATING && type2 == FLOATING) {
+        return FLOATING;
+    }
+    else if (type1 == INTEGER && type2 == FLOATING) {
+        return FLOATING;
+    }
+    else if (type1 == FLOATING && type2 == INTEGER) {
+        return FLOATING;
+    }
+    else return NULLVOID;
+}
+
