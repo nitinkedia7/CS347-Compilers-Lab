@@ -24,14 +24,16 @@ int scope;
 int found;
 %} 
 
+%code requires{
+    #include "funcTab.h"
+}
+
 %union {
     int intval;
     float floatval;
     char *idName;
 
-    struct expression {
-        int type;
-    };
+    struct expression expr;
 }
 
 %token INT FLOAT VOID NUMFLOAT NUMINT ID NEWLINE
@@ -43,7 +45,7 @@ int found;
 %type <idName> NUMFLOAT
 %type <idName> NUMINT
 %type <idName> ID
-%type <expression> EXPR2 EXPR21 TERM FACTOR ID_ARR ASG ASG1
+%type <expr> EXPR2 EXPR21 TERM FACTOR ID_ARR ASG ASG1 EXPR1 CONDITION1 CONDITION2 LHS
 
 %%
 
@@ -134,7 +136,8 @@ DECL_PLIST: DECL_PL
 
 DECL_PL: DECL_PL COMMA DECL_PARAM
     {
-        searchParam(varRecord->name, typeRecordList, found);
+        typeRecord* pn = NULL;
+        searchParam(varRecord->name, typeRecordList, found, pn);
         if(found){
             cout<<"Redeclaration of parameter"<<(varRecord->name)<<endl;
         } else {
@@ -144,8 +147,9 @@ DECL_PL: DECL_PL COMMA DECL_PARAM
         
     }
     | DECL_PARAM
-    {   
-        searchParam(varRecord->name, typeRecordList, found);
+    {  
+        typeRecord* pn = NULL;
+        searchParam(varRecord->name, typeRecordList, found , pn );
         if(found){
             cout<<"Redeclaration of parameter"<<(varRecord->name)<<endl;
         } else {
@@ -181,10 +185,25 @@ STMT: VAR_DECL
     | IFSTMT
     | WHILESTMT
     | SWITCHCASE
-    | LCB BODY RCB
+    | LCB {scope++;} BODY RCB 
+    {
+        deleteVarList(activeFuncPtr, scope);
+        scope--;
+    }
     | BREAK SEMI
     | CONTINUE SEMI
-    | RETURN ASG1 SEMI
+    | RETURN ASG1 SEMI 
+    {
+        if(activeFuncPtr->returnType == NULLVOID && ($2.type != NULLVOID)){
+            cout<<"The function "<< activeFuncPtr->name<<" has no return type"<<endl;
+        }
+        else if(activeFuncPtr->returnType != NULLVOID && ($2.type == NULLVOID || $2.type == ERRORTYPE)){
+            cout<<"The function "<< activeFuncPtr->name<<" must have a"<<" return type"<<endl;
+        }
+        else{
+
+        }
+    }
 ;
 
 VAR_DECL: D SEMI 
@@ -244,6 +263,41 @@ DEC_ID_ARR: ID
         }
     }
     | ID ASSIGN ASG
+    {
+        int found = 0;
+        typeRecord* vn = NULL;
+        // cout << "Scope : "<<scope<<endl;
+        searchVariable(string($1), activeFuncPtr, found, vn);
+        if (found && vn->scope == scope) {
+            printf("Variable %s already declared at same level %d\n", $1, scope);
+        }
+        else if (scope == 2) {
+            typeRecord* pn = NULL;
+            searchParam(string($1), activeFuncPtr->parameterList, found , pn);
+            if (found) {
+                printf("Parameter with name %s exists %d\n", $1, scope);
+            } 
+            else {
+                varRecord = new typeRecord;
+                varRecord->name = string($1);
+                // printf("var $1:%s\n", $1);
+                varRecord->type = SIMPLE;
+                varRecord->tag = VARIABLE;
+                varRecord->scope = scope;
+                // cout<<"variable name: "<<varRecord->name<<endl;
+                typeRecordList.push_back(varRecord);
+            }
+        }
+        else {
+            varRecord = new typeRecord;
+            varRecord->name = string($1);
+            varRecord->type = SIMPLE;
+            varRecord->tag = VARIABLE;
+            varRecord->scope = scope;
+            // cout<<"variable name: "<<varRecord->name<<endl;
+            typeRecordList.push_back(varRecord);
+        }
+    }
     | ID BR_DIMLIST
     {  
         int found = 0;
@@ -261,7 +315,7 @@ DEC_ID_ARR: ID
             else {
                 varRecord = new typeRecord;
                 varRecord->name = string($1);
-                varRecord->type = SIMPLE;
+                varRecord->type = ARRAY;
                 varRecord->tag = VARIABLE;
                 varRecord->scope = scope;
                 // cout<<"variable name: "<<varRecord->name<<endl;
@@ -283,41 +337,135 @@ DEC_ID_ARR: ID
 
 BR_DIMLIST: LSB NUMINT RSB
     {
-        dimlist.push_back($2);
+        dimlist.push_back(atoi($2));
     }
     | BR_DIMLIST LSB NUMINT RSB 
     {
-        dimlist.push_back($3);
+        dimlist.push_back(atoi($3));
     }
 ;
 
 FUNC_CALL: ID LP PARAMLIST RP
     {
-        
+        callFuncPtr = new funcEntry;
+        callFuncPtr->name = string($1);
+        callFuncPtr->parameterList = typeRecordList;
+        callFuncPtr->numOfParam = typeRecordList.size();
+        typeRecordList.clear();
+        int found = 0;
+        // printFunction(activeFuncPtr);
+        // printFunction(callFuncPtr);
+        compareFunc(callFuncPtr,funcEntryRecord,found);
+        if(found == 0){
+            cout<<"No function with name --"<<string($1)<<"-- exits"<<endl;
+        }
+        else if(found == -1){
+            cout <<"Parameter list does not match with declared function paramters"<<endl;
+        }
+        else{
+            // to do when funtion is called correctly
+            // cout<<"YESSS"<<endl;
+        }
     }
 ;
+
 
 PARAMLIST: PLIST 
     | %empty 
 ;
 
-PLIST: PLIST COMMA CONDITION1
-    | CONDITION1
+PLIST: PLIST COMMA ASG
+    {
+        varRecord = new typeRecord;
+        varRecord->eleType = $3.type;
+        typeRecordList.push_back(varRecord);
+    }
+    | ASG
+    {
+        varRecord = new typeRecord;
+        varRecord->eleType = $1.type;
+        typeRecordList.push_back(varRecord);
+    }
 ;
 
 ASG: CONDITION1
+    {
+        $$.type = $1.type;
+    }
     | LHS ASSIGN ASG
+    {
+        if($3.type == NULLVOID || $3.type==ERRORTYPE){
+            cout<<"Can't assign void to int or float"<<endl;
+            $$.type = ERRORTYPE;
+        }
+        else{
+            $$.type = $1.type;
+        }
+        
+    }
     | LHS PLUSASG ASG
+    {
+        if($3.type == NULLVOID || $3.type==ERRORTYPE){
+            cout<<"Can't assign void to int or float"<<endl;
+            $$.type = ERRORTYPE;
+        }
+        else{
+            $$.type = $1.type;
+        }
+    }
     | LHS MINASG ASG
+    {
+        if($3.type == NULLVOID || $3.type==ERRORTYPE){
+            cout<<"Can't assign void to int or float"<<endl;
+            $$.type = ERRORTYPE;
+        }
+        else{
+            $$.type = $1.type;
+        }
+    }
     | LHS MULASG ASG
+    {
+        if($3.type == NULLVOID || $3.type==ERRORTYPE){
+            cout<<"Can't assign void to int or float"<<endl;
+            $$.type = ERRORTYPE;
+        }
+        else{
+            $$.type = $1.type;
+        }
+    }
     | LHS DIVASG ASG
+    {
+        if($3.type == NULLVOID || $3.type==ERRORTYPE){
+            cout<<"Can't assign void to int or float"<<endl;
+            $$.type = ERRORTYPE;
+        }
+        else{
+            $$.type = $1.type;
+        }
+    }
     | LHS MODASG ASG
+    {
+        if($3.type == NULLVOID || $3.type==ERRORTYPE){
+            cout<<"Can't assign void to int or float"<<endl;
+            $$.type = ERRORTYPE;
+        }
+        else{
+            $$.type = $1.type;
+        }
+    }
 ;
 
-LHS: ID_ARR   
+LHS: ID_ARR  
+    {
+        $$.type = $1.type;
+    } 
 ;
 
-SWITCHCASE: SWITCH LP ASG RP LCB CASELIST RCB
+SWITCHCASE: SWITCH LP ASG RP {scope++;} LCB CASELIST RCB 
+        {
+            deleteVarList(activeFuncPtr,scope);
+            scope--;
+        }
 ;
 
 CASELIST:   CASE CONDITION1 COLON BODY CASELIST
@@ -326,44 +474,112 @@ CASELIST:   CASE CONDITION1 COLON BODY CASELIST
 ;
 
 FORLOOP: FOREXP LCB BODY RCB
+    {
+        deleteVarList(activeFuncPtr, scope);
+        scope--;
+    }
 ;
 
 FOREXP: FOR LP ASG1 SEMI ASG1 SEMI ASG1 RP
+    {
+        // if($3.type == ERRORTYPE || $5.type == ERRORTYPE || $7.type == ERRORTYPE){
+            
+        // }
+        scope++;
+    }
 ;
 
 ASG1: ASG
+    {
+        $$.type= $1.type;
+    }
     | %empty
+    {
+        $$.type = NULLVOID;
+    }
 ;
 
-IFSTMT: IFEXP LCB BODY RCB
-    | IFEXP LCB BODY RCB ELSE LCB BODY RCB
+IFSTMT: IFEXP LCB BODY RCB 
+        {
+            deleteVarList(activeFuncPtr,scope);
+            scope--;
+        }
+    | IFEXP LCB BODY RCB {deleteVarList(activeFuncPtr,scope);} ELSE LCB BODY RCB
+    {
+        deleteVarList(activeFuncPtr,scope);
+        scope--;
+    }
 ;
 
 IFEXP: IF LP ASG RP 
+    {
+        if($3.type == NULLVOID){
+            cout<<"Expression in if statement can't be empty"<<endl;
+        }
+        scope++;
+    }
 ;
 
 WHILESTMT:  WHILEEXP LCB BODY RCB 
+    {
+        deleteVarList(activeFuncPtr,scope);
+        scope--;
+    }
 ;
 
 WHILEEXP: WHILE LP ASG RP
+        {
+            if($3.type == NULLVOID){
+                cout<<"Expression in if statement can't be empty"<<endl;
+            }
+            scope++;
+        }
 ;
 
 CONDITION1: CONDITION2 OR CONDITION1
+    {
+        if($1.type==ERRORTYPE || $3.type==ERRORTYPE){
+            $$.type = ERRORTYPE;
+        }
+        else{
+            $$.type = BOOLEAN;
+        }
+    }
     | CONDITION2
+    {
+        $$.type = $1.type;
+    }
 ;  
 
 CONDITION2: EXPR1 AND CONDITION2
+    {
+        if($1.type==ERRORTYPE || $3.type==ERRORTYPE){
+            $$.type = ERRORTYPE;
+        }
+        else{
+            $$.type = BOOLEAN;
+        }
+    }
     | EXPR1
+    {
+        $$.type = $1.type;
+    }
 ;
 
 EXPR1: NOT EXPR21
+    {
+        $$.type = $2.type;
+    }
     | EXPR21
+    {
+        $$.type = $1.type;
+    }
 ;
 
 EXPR21: EXPR2 EQUAL EXPR2
     {
-        if ($1.type == NULLVOID || $3.type == NULLVOID) {
-            $$.type = NULLVOID;
+        if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
+            $$.type = ERRORTYPE;
         }
         else {
             $$.type = BOOLEAN;
@@ -371,8 +587,8 @@ EXPR21: EXPR2 EQUAL EXPR2
     }
     | EXPR2 NOTEQUAL EXPR2
     {
-        if($1.type == NULLVOID || $3.type == NULLVOID){
-            $$.type = NULLVOID;
+        if($1.type == ERRORTYPE || $3.type == ERRORTYPE){
+            $$.type = ERRORTYPE;
         }
         else{
             $$.type = BOOLEAN;
@@ -380,8 +596,8 @@ EXPR21: EXPR2 EQUAL EXPR2
     }
     | EXPR2 LT EXPR2 
     {
-        if($1.type == NULLVOID || $3.type == NULLVOID){
-            $$.type = NULLVOID;
+        if($1.type == ERRORTYPE || $3.type == ERRORTYPE){
+            $$.type = ERRORTYPE;
         }
         else{
             $$.type = BOOLEAN;
@@ -389,8 +605,8 @@ EXPR21: EXPR2 EQUAL EXPR2
     }
     | EXPR2 GT EXPR2
     {
-        if($1.type == NULLVOID || $3.type == NULLVOID){
-            $$.type = NULLVOID;
+        if($1.type == ERRORTYPE || $3.type == ERRORTYPE){
+            $$.type = ERRORTYPE;
         }
         else{
             $$.type = BOOLEAN;
@@ -398,8 +614,8 @@ EXPR21: EXPR2 EQUAL EXPR2
     }
     | EXPR2 LE EXPR2
     {
-        if($1.type == NULLVOID || $3.type == NULLVOID){
-            $$.type = NULLVOID;
+        if($1.type == ERRORTYPE || $3.type == ERRORTYPE){
+            $$.type = ERRORTYPE;
         }
         else{
             $$.type = BOOLEAN;
@@ -407,8 +623,8 @@ EXPR21: EXPR2 EQUAL EXPR2
     }
     | EXPR2 GE EXPR2
     {
-        if($1.type == NULLVOID || $3.type == NULLVOID){
-            $$.type = NULLVOID;
+        if($1.type == ERRORTYPE || $3.type == ERRORTYPE){
+            $$.type = ERRORTYPE;
         }
         else{
             $$.type = BOOLEAN;
@@ -420,7 +636,7 @@ EXPR21: EXPR2 EQUAL EXPR2
             $$.type = INTEGER;      
         }
         else {
-            $$.type = NULLVOID;
+            $$.type = ERRORTYPE;
             cout << "Cannot increment non-integer type variable" << endl; 
         }
     } 
@@ -430,27 +646,27 @@ EXPR21: EXPR2 EQUAL EXPR2
             $$.type = INTEGER;      
         }
         else {
-            $$.type = NULLVOID;
+            $$.type = ERRORTYPE;
             cout << "Cannot increment non-integer type variable" << endl; 
         }
     } 
     | INCREMENT ID_ARR
     {
-        if ($1.type == INTEGER) {
+        if ($2.type == INTEGER) {
             $$.type = INTEGER;      
         }
         else {
-            $$.type = NULLVOID;
+            $$.type = ERRORTYPE;
             cout << "Cannot increment non-integer type variable" << endl; 
         }
     } 
     | DECREMENT ID_ARR
     {
-        if ($1.type == INTEGER) {
+        if ($2.type == INTEGER) {
             $$.type = INTEGER;      
         }
         else {
-            $$.type = NULLVOID;
+            $$.type = ERRORTYPE;
             cout << "Cannot increment non-integer type variable" << endl; 
         }
     } 
@@ -459,31 +675,31 @@ EXPR21: EXPR2 EQUAL EXPR2
 
 EXPR2:  EXPR2 PLUS TERM
     {
-        if ($1.type == NULLVOID || $3.type == NULLVOID) {
-          $$.type = NULLVOID;  
+        if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
+          $$.type = ERRORTYPE;  
         }
         else {
-            if (arithCompatible($1.type, $3.type)) {
+            if (arithmeticCompatible($1.type, $3.type)) {
                 $$.type = compareTypes($1.type,$3.type);
             }
             else {
                 cout << "Type mismatch in expression" << endl;
-                $$.type = NULLVOID;
+                $$.type = ERRORTYPE;
             }
         } 
     }
     | EXPR2 MINUS TERM
     {
-        if ($1.type == NULLVOID || $3.type == NULLVOID) {
-          $$.type = NULLVOID;  
+        if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
+          $$.type = ERRORTYPE;  
         }
         else {
-            if (arithCompatible($1.type, $3.type)) {
+            if (arithmeticCompatible($1.type, $3.type)) {
                 $$.type = compareTypes($1.type,$3.type);
             }
             else {
                 cout << "Type mismatch in expression" << endl;
-                $$.type = NULLVOID;
+                $$.type = ERRORTYPE;
             }
         } 
     }
@@ -492,31 +708,31 @@ EXPR2:  EXPR2 PLUS TERM
 
 TERM: TERM MUL FACTOR
     {
-        if ($1.type == NULLVOID || $3.type == NULLVOID) {
-          $$.type = NULLVOID;  
+        if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
+          $$.type = ERRORTYPE;  
         }
         else {
-            if (arithCompatible($1.type, $3.type)) {
+            if (arithmeticCompatible($1.type, $3.type)) {
                 $$.type = compareTypes($1.type,$3.type);
             }
             else {
                 cout << "Type mismatch in expression" << endl;
-                $$.type = NULLVOID;
+                $$.type = ERRORTYPE;
             }
         }       
     }
     | TERM DIV FACTOR  
     {
-        if ($1.type == NULLVOID || $3.type == NULLVOID) {
-          $$.type = NULLVOID;  
+        if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
+          $$.type = ERRORTYPE;  
         }
         else {
-            if (arithCompatible($1.type, $3.type)) {
+            if (arithmeticCompatible($1.type, $3.type)) {
                 $$.type = compareTypes($1.type,$3.type);
             }
             else {
                 cout << "Type mismatch in expression" << endl;
-                $$.type = NULLVOID;
+                $$.type = ERRORTYPE;
             }
         }   
     } 
@@ -526,7 +742,7 @@ TERM: TERM MUL FACTOR
 FACTOR: ID_ARR  { $$.type = $1.type; }
     | NUMINT    { $$.type = INTEGER; }
     | NUMFLOAT  { $$.type = FLOATING; }
-    | FUNC_CALL { $$.type = callFuncPtr->returnType; }
+    | FUNC_CALL { $$.type = callFuncPtr->returnType; delete callFuncPtr;}
     | LP ASG RP { $$.type = $2.type; } 
 ;
 
@@ -535,7 +751,7 @@ ID_ARR: ID
         // retrieve the highest level id with same name in param list or var list
         int found = 0;
         typeRecord* vn = NULL;
-        searchVariable(string($1), activeFuncPtr->variableList, found, vn); 
+        searchVariable(string($1), activeFuncPtr, found, vn); 
         if(found){
             if (vn->type == SIMPLE) {
                 $$.type = vn->eleType;
@@ -566,7 +782,7 @@ ID_ARR: ID
         // retrieve the highest level id with same name in param list or var list
         int found = 0;
         typeRecord* vn = NULL;
-        searchVariable(string($1), activeFuncPtr->variableList, found, vn); 
+        searchVariable(string($1), activeFuncPtr, found, vn); 
         if(found){
             if (vn->type == ARRAY) {
                 $$.type = vn->eleType;

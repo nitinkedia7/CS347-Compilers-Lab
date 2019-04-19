@@ -1,6 +1,6 @@
 #include "funcTab.h"
 
-void patchDataType(int eleType, vector<typeRecord*> &typeRecordList, int scope){
+void patchDataType(eletype eleType, vector<typeRecord*> &typeRecordList, int scope){
     for (typeRecord* &it:typeRecordList) {
         it->scope = scope;
         it->eleType = eleType;
@@ -64,6 +64,7 @@ void searchFunc(funcEntry* activeFuncPtr, vector<funcEntry*> &funcEntryRecord, i
             int flag=1;
             for(int i=0;i<it->numOfParam;i++){
                 if((it->parameterList[i])->eleType != activeFuncPtr->parameterList[i]->eleType){
+                     found=-1;
                      flag=0;
                      break;
                 }
@@ -74,7 +75,31 @@ void searchFunc(funcEntry* activeFuncPtr, vector<funcEntry*> &funcEntryRecord, i
             } 
         }
     }
-    found=0;
+    if(found != -1)
+        found=0;
+    return;    
+}
+
+void compareFunc(funcEntry* &activeFuncPtr, vector<funcEntry*> &funcEntryRecord, int &found){
+    for(auto it:funcEntryRecord){
+        if(it->name == activeFuncPtr->name  && it->numOfParam == activeFuncPtr->numOfParam){
+            int flag=1;
+            for(int i=0;i<it->numOfParam;i++){
+                if((it->parameterList[i])->eleType != activeFuncPtr->parameterList[i]->eleType){
+                     found=-1;
+                     flag=0;
+                     break;
+                }
+            }
+            if(flag == 1){
+                found=1;
+                activeFuncPtr->returnType = it->returnType;
+                return;
+            } 
+        }
+    }
+    if(found != -1)
+        found=0;
     return;    
 }
 
@@ -84,25 +109,25 @@ void printList(vector<funcEntry*> &funcEntryRecord){
         cout<<"Function Entry: "<<(it->name)<<endl;
         cout<<"Printing Parameter List"<<endl;
         for(auto it2:it->parameterList){
-            cout<<(it2->name)<<" "<<(it2->type)<<endl;
+            cout<<(it2->name)<<" "<<(it2->eleType)<<endl;
         }
         cout<<"Printing Variable List"<<endl;
         for(auto it2:it->parameterList){
-            cout<<(it2->name)<<" "<<(it2->type)<<endl;
+            cout<<(it2->name)<<" "<<(it2->eleType)<<endl;
         } 
     }
 }
 
 void printFunction(funcEntry* &activeFuncPtr){
     
-        cout<<"Function Entry: "<<(activeFuncPtr->name)<<endl;
+        cout<<"Function Entry: --"<<(activeFuncPtr->name)<<"--"<<endl;
         cout<<"Printing Parameter List"<<endl;
         for(auto it2:activeFuncPtr->parameterList){
-            cout<<(it2->name)<<" "<<(it2->type)<<endl;
+            cout<<(it2->name)<<" "<<(it2->eleType)<<endl;
         }
         cout<<"Printing Variable List"<<endl;
         for(auto it2:activeFuncPtr->variableList){
-            cout<<(it2->name)<<" "<<(it2->type)<<endl;
+            cout<<(it2->name)<<" "<<(it2->eleType)<<endl;
         } 
 }
 
@@ -110,13 +135,13 @@ void addFunction(funcEntry* activeFuncPtr, vector<funcEntry*> &funcEntryRecord){
     funcEntryRecord.push_back(activeFuncPtr);
 }
 
-bool arithmeticCompatible(int type1, int type2) {
+bool arithmeticCompatible(eletype type1, eletype type2) {
     if ((type1 == INTEGER || type1 == FLOATING)
         && (type2 == INTEGER || type2 == FLOATING)) return true;
     return false;
 }
 
-int compareTypes(int type1, int type2) {
+eletype compareTypes(eletype type1, eletype type2) {
     if (type1 == INTEGER && type2 == INTEGER) {
         return INTEGER;
     }

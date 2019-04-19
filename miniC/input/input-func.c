@@ -1,3 +1,4 @@
+
 int gcd(int a, int c, int b) {
     int e, d;
     c = a;
@@ -8,7 +9,7 @@ int gcd(int a, int c, int b) {
         c = c + d;
     }
     if (b == 0) {
-        return gcd(a,b);
+        return gcd(a,b,f);
     }
     return a;
 }
