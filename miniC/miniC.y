@@ -17,11 +17,16 @@ vector<typeRecord*> typeRecordList;
 typeRecord* varRecord;
 vector<int> dimlist;
 
+int nextquad;
+vector<string> functionInstruction;
+registerSet tempSet;
+
 vector<funcEntry*> funcEntryRecord;
 funcEntry* activeFuncPtr;
 funcEntry* callFuncPtr;
 int scope;
 int found;
+int labelCount=0;
 %} 
 
 %code requires{
@@ -32,8 +37,11 @@ int found;
     int intval;
     float floatval;
     char *idName;
+    int quad;
 
     struct expression expr;
+    struct stmt stmtval;
+    struct whileexp whileexpval;
 }
 
 %token INT FLOAT VOID NUMFLOAT NUMINT ID NEWLINE
@@ -46,6 +54,9 @@ int found;
 %type <idName> NUMINT
 %type <idName> ID
 %type <expr> EXPR2 EXPR21 TERM FACTOR ID_ARR ASG ASG1 EXPR1 CONDITION1 CONDITION2 LHS
+%type <whileexpval> WHILEEXP IFEXP
+%type <stmtval> BODY WHILESTMT IFSTMT
+%type <quad> M1 M3 N3 P3
 
 %%
 
@@ -462,10 +473,10 @@ LHS: ID_ARR
 ;
 
 SWITCHCASE: SWITCH LP ASG RP {scope++;} LCB CASELIST RCB 
-        {
-            deleteVarList(activeFuncPtr,scope);
-            scope--;
-        }
+    {
+        deleteVarList(activeFuncPtr,scope);
+        scope--;
+    }
 ;
 
 CASELIST:   CASE CONDITION1 COLON BODY CASELIST
@@ -480,13 +491,32 @@ FORLOOP: FOREXP LCB BODY RCB
     }
 ;
 
-FOREXP: FOR LP ASG1 SEMI ASG1 SEMI ASG1 RP
+FOREXP: FOR LP ASG1 SEMI M3 ASG1 SEMI N3 ASG1 P3 RP
     {
         // if($3.type == ERRORTYPE || $5.type == ERRORTYPE || $7.type == ERRORTYPE){
             
         // }
         scope++;
     }
+;
+
+M1: %empty
+    {
+        M1.quad=nextquad;
+    }
+;
+
+M2: %empty
+    {
+        M2.quad=nextquad;
+    }
+;
+
+M3: %empty { M3.quad = nextquad; }
+;
+N3: %empty { N3.quad = nextquad; }
+;
+P3: %empty { P3.quad = nextquad; }
 ;
 
 ASG1: ASG
@@ -500,19 +530,26 @@ ASG1: ASG
 ;
 
 IFSTMT: IFEXP LCB BODY RCB 
-        {
-            deleteVarList(activeFuncPtr,scope);
-            scope--;
-        }
-    | IFEXP LCB BODY RCB {deleteVarList(activeFuncPtr,scope);} ELSE LCB BODY RCB
     {
         deleteVarList(activeFuncPtr,scope);
         scope--;
+        merge($$.nextList, $1.falseList);
+        merge($$.nextList, $3.breakList);
+    }
+    | IFEXP LCB BODY RCB {deleteVarList(activeFuncPtr,scope);} M2 ELSE M1 LCB BODY RCB
+    {
+        deleteVarList(activeFuncPtr,scope);
+        scope--;
+        // backpatch($$.falseList,$7.quad,functionInstruction);
+        // merge($3.nextList, );
     }
 ;
 
 IFEXP: IF LP ASG RP 
     {
+        $$.falselist->push_back(nextquad);
+        // TODO
+        gen(functionInstruction, "if E.result<=0 goto ", nextquad);
         if($3.type == NULLVOID){
             cout<<"Expression in if statement can't be empty"<<endl;
         }
@@ -524,16 +561,29 @@ WHILESTMT:  WHILEEXP LCB BODY RCB
     {
         deleteVarList(activeFuncPtr,scope);
         scope--;
+
+        gen(functionInstruction, "goto L" + $1.begin, nextquad);
+        backpatch($3.nextList, $1.begin, functionInstruction);
+        backpatch($3.continueList, $1.begin, functionInstruction);
+        ($$.continueList)->clear();
+        ($$.breakList)->clear();
+        merge($$.nextList, $1.falseList);
+        merge($$.nextList, $3.breakList);
     }
 ;
 
-WHILEEXP: WHILE LP ASG RP
-        {
-            if($3.type == NULLVOID){
-                cout<<"Expression in if statement can't be empty"<<endl;
-            }
-            scope++;
+WHILEEXP: WHILE M1 LP ASG RP
+    {
+        if($3.type == NULLVOID){
+            cout<<"Expression in if statement can't be empty"<<endl;
         }
+        scope++;
+        
+        ($$.falselist)->push_back(nextquad);
+        // TODO E.result = T0, append label;
+        gen(functionInstruction, "if E.result <= 0 goto ", nextquad);
+        $$.begin = $2.quad; 
+    }
 ;
 
 CONDITION1: CONDITION2 OR CONDITION1
@@ -739,7 +789,11 @@ TERM: TERM MUL FACTOR
     | FACTOR { $$.type = $1.type; }
 ;
 
-FACTOR: ID_ARR  { $$.type = $1.type; }
+FACTOR: ID_ARR  
+    { 
+        $$.type = $1.type;
+        $$.variableList = new string(tempSet.getRegister());
+    }
     | NUMINT    { $$.type = INTEGER; }
     | NUMFLOAT  { $$.type = FLOATING; }
     | FUNC_CALL { $$.type = callFuncPtr->returnType; delete callFuncPtr;}
@@ -820,6 +874,7 @@ void yyerror(char *s)
 
 int main(int argc, char **argv)
 {
+    nextquad = 0;
     scope = 0;
     yyparse();
 }

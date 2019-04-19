@@ -6,11 +6,35 @@ enum eletype {INTEGER, FLOATING, NULLVOID, BOOLEAN, ERRORTYPE};
 enum varType {SIMPLE, ARRAY};
 enum Tag{PARAMAETER, VARIABLE};
 
+class resgisterSet{
+private:
+    vector<int> tempRegister;
+public:
+    resgisterSet(){
+        tempRegister.clear();
+        for(int i=0; i<10; i++){
+            tempRegister.push_back(i);
+        }
+    }
+    string getRegister();
+    void freeRegister(string s);
+}
 
 struct expression{
     eletype type;
-    char* variableName;
+    string* variableName;
 };
+
+struct stmt {
+    vector<int> *nextList;
+    vector<int> *continueList;
+    vector<int> *breakList;
+};
+
+struct whileexp {
+    int begin;
+    vector<int> *falseList;
+}
 
 struct typeRecord {
     string name;
@@ -42,3 +66,8 @@ void printList(vector<funcEntry*> &funcEntryRecord);
 void printFunction(funcEntry* &activeFuncPtr);
 bool arithmeticCompatible(eletype type1, eletype type2);
 eletype compareTypes(eletype type1, eletype type2);
+
+int gen(vector<string> &, string ,int &);
+void backpatch(vector<int> *, int, vector<string> &);
+//vector<int> *, funcIns, string, 
+void merge(vector<int> *, vector<int> *);
