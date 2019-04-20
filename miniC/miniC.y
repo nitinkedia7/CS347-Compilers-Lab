@@ -2,6 +2,7 @@
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 #include <bits/stdc++.h>
 #include "funcTab.h"
+#include "codegenHelpers.h"
 using namespace std;
 
 extern int yylex();
@@ -11,6 +12,7 @@ extern char* yytext;
 extern int yyleng;
 void yyerror(char* s);
 
+FILE *outasm, *outinter, *outtemp;
 string text;
 eletype resultType;
 vector<typeRecord*> typeRecordList;
@@ -26,11 +28,15 @@ funcEntry* activeFuncPtr;
 funcEntry* callFuncPtr;
 int scope;
 int found;
-int labelCount=0;
+int labelCount;
+
+bool errorFound;
 %} 
+
 
 %code requires{
     #include "funcTab.h"
+    #include "codegenHelpers.h"
 }
 
 %union {
@@ -53,9 +59,9 @@ int labelCount=0;
 %type <idName> NUMFLOAT
 %type <idName> NUMINT
 %type <idName> ID
-%type <expr> EXPR2 EXPR21 TERM FACTOR ID_ARR ASG ASG1 EXPR1 CONDITION1 CONDITION2 LHS
-%type <whileexpval> WHILEEXP IFEXP
-%type <stmtval> BODY WHILESTMT IFSTMT
+%type <expr> EXPR2 TERM FACTOR ID_ARR ASG ASG1 EXPR1 EXPR21 CONDITION1 CONDITION2 LHS
+%type <whileexpval> WHILEEXP IFEXP 
+%type <stmtval> BODY WHILESTMT IFSTMT M2
 %type <quad> M1 M3 N3 P3
 
 %%
@@ -161,7 +167,7 @@ DECL_PL: DECL_PL COMMA DECL_PARAM
     {  
         typeRecord* pn = NULL;
         searchParam(varRecord->name, typeRecordList, found , pn );
-        if(found){
+        if (found){
             cout<<"Redeclaration of parameter"<<(varRecord->name)<<endl;
         } else {
             // cout<<"\nVar Name : "<<varRecord->name<<endl;
@@ -493,30 +499,9 @@ FORLOOP: FOREXP LCB BODY RCB
 
 FOREXP: FOR LP ASG1 SEMI M3 ASG1 SEMI N3 ASG1 P3 RP
     {
-        // if($3.type == ERRORTYPE || $5.type == ERRORTYPE || $7.type == ERRORTYPE){
-            
-        // }
+        
         scope++;
     }
-;
-
-M1: %empty
-    {
-        M1.quad=nextquad;
-    }
-;
-
-M2: %empty
-    {
-        M2.quad=nextquad;
-    }
-;
-
-M3: %empty { M3.quad = nextquad; }
-;
-N3: %empty { N3.quad = nextquad; }
-;
-P3: %empty { P3.quad = nextquad; }
 ;
 
 ASG1: ASG
@@ -529,30 +514,61 @@ ASG1: ASG
     }
 ;
 
+M1: %empty
+    {
+        $$=nextquad;
+        gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+    }
+;
+
+M2: %empty
+    {
+        ($$.nextList)->push_back(nextquad);
+        gen(functionInstruction, "goto ", nextquad);
+    }
+;
+
+M3: %empty { $$ = nextquad; }
+;
+N3: %empty { $$ = nextquad; }
+;
+P3: %empty { $$ = nextquad; }
+;
+
+
 IFSTMT: IFEXP LCB BODY RCB 
     {
         deleteVarList(activeFuncPtr,scope);
         scope--;
         merge($$.nextList, $1.falseList);
-        merge($$.nextList, $3.breakList);
+        merge($$.breakList, $3.breakList);
+        merge($$.continueList, $3.continueList);
+        backpatch($$.nextList,nextquad,functionInstruction);
+        gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
     }
     | IFEXP LCB BODY RCB {deleteVarList(activeFuncPtr,scope);} M2 ELSE M1 LCB BODY RCB
     {
         deleteVarList(activeFuncPtr,scope);
         scope--;
-        // backpatch($$.falseList,$7.quad,functionInstruction);
-        // merge($3.nextList, );
+        backpatch($1.falseList,$8,functionInstruction);
+        merge($$.nextList,$6.nextList );
+        backpatch($$.nextList,nextquad,functionInstruction);
+        gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+        merge($$.breakList, $3.breakList);
+        merge($$.continueList, $3.continueList);
+        merge($$.breakList, $10.breakList);
+        merge($$.continueList, $10.continueList);
     }
 ;
 
 IFEXP: IF LP ASG RP 
     {
-        $$.falselist->push_back(nextquad);
-        // TODO
-        gen(functionInstruction, "if E.result<=0 goto ", nextquad);
+        $$.falseList->push_back(nextquad);
         if($3.type == NULLVOID){
             cout<<"Expression in if statement can't be empty"<<endl;
+            errorFound=true;
         }
+        gen(functionInstruction, "if "+ (*($3.registerName)) + " == 0 goto ", nextquad);
         scope++;
     }
 ;
@@ -562,27 +578,27 @@ WHILESTMT:  WHILEEXP LCB BODY RCB
         deleteVarList(activeFuncPtr,scope);
         scope--;
 
-        gen(functionInstruction, "goto L" + $1.begin, nextquad);
+        gen(functionInstruction, "goto L" + to_string($1.begin), nextquad);
         backpatch($3.nextList, $1.begin, functionInstruction);
         backpatch($3.continueList, $1.begin, functionInstruction);
-        ($$.continueList)->clear();
-        ($$.breakList)->clear();
         merge($$.nextList, $1.falseList);
         merge($$.nextList, $3.breakList);
+        backpatch($$.nextList,nextquad,functionInstruction);
+        gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
     }
 ;
 
 WHILEEXP: WHILE M1 LP ASG RP
     {
-        if($3.type == NULLVOID){
+        if($4.type == NULLVOID){
             cout<<"Expression in if statement can't be empty"<<endl;
+            errorFound = true;
         }
         scope++;
         
-        ($$.falselist)->push_back(nextquad);
-        // TODO E.result = T0, append label;
-        gen(functionInstruction, "if E.result <= 0 goto ", nextquad);
-        $$.begin = $2.quad; 
+        ($$.falseList)->push_back(nextquad);
+        gen(functionInstruction, "if " + *($4.registerName) + "== 0 goto ", nextquad);
+        $$.begin = $2; 
     }
 ;
 
@@ -593,36 +609,60 @@ CONDITION1: CONDITION2 OR CONDITION1
         }
         else{
             $$.type = BOOLEAN;
+            $$.registerName = new string(tempSet.getRegister());
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " || " + (*($3.registerName)) + ";";   
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(*($1.registerName));
+            tempSet.freeRegister(*($3.registerName)); 
         }
     }
     | CONDITION2
     {
         $$.type = $1.type;
+        if ($$.type != ERRORTYPE) {
+            $$.registerName = $1.registerName;    
+        }
     }
 ;  
 
 CONDITION2: EXPR1 AND CONDITION2
     {
-        if($1.type==ERRORTYPE || $3.type==ERRORTYPE){
+        if ($1.type==ERRORTYPE || $3.type==ERRORTYPE) {
             $$.type = ERRORTYPE;
         }
         else{
             $$.type = BOOLEAN;
+            $$.registerName = new string(tempSet.getRegister());
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " && " + (*($3.registerName)) + ";";   
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(*($1.registerName));
+            tempSet.freeRegister(*($3.registerName));   
         }
     }
     | EXPR1
     {
         $$.type = $1.type;
+        if ($$.type != ERRORTYPE) {
+            $$.registerName = $1.registerName;    
+        }
     }
 ;
 
 EXPR1: NOT EXPR21
     {
         $$.type = $2.type;
+        if ($$.type != ERRORTYPE) {
+            $$.registerName = $2.registerName;
+            string s = (*($$.registerName)) + " = ~" + (*($2.registerName))+";";   
+            gen(functionInstruction, s, nextquad);
+        }
     }
     | EXPR21
     {
         $$.type = $1.type;
+        if ($$.type != ERRORTYPE) {
+            $$.registerName = $1.registerName;    
+        }
     }
 ;
 
@@ -633,6 +673,11 @@ EXPR21: EXPR2 EQUAL EXPR2
         }
         else {
             $$.type = BOOLEAN;
+            $$.registerName = new string(tempSet.getRegister());     
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " == " + (*($3.registerName))+ ";";   
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(*($1.registerName));
+            tempSet.freeRegister(*($3.registerName));  
         }   
     }
     | EXPR2 NOTEQUAL EXPR2
@@ -642,6 +687,11 @@ EXPR21: EXPR2 EQUAL EXPR2
         }
         else{
             $$.type = BOOLEAN;
+            $$.registerName = new string(tempSet.getRegister());     
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " != " + (*($3.registerName))+ ";";   
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(*($1.registerName));
+            tempSet.freeRegister(*($3.registerName));  
         }   
     }
     | EXPR2 LT EXPR2 
@@ -651,6 +701,11 @@ EXPR21: EXPR2 EQUAL EXPR2
         }
         else{
             $$.type = BOOLEAN;
+            $$.registerName = new string(tempSet.getRegister());     
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " < " + (*($3.registerName))+ ";";   
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(*($1.registerName));
+            tempSet.freeRegister(*($3.registerName));  
         }   
     }
     | EXPR2 GT EXPR2
@@ -660,6 +715,11 @@ EXPR21: EXPR2 EQUAL EXPR2
         }
         else{
             $$.type = BOOLEAN;
+            $$.registerName = new string(tempSet.getRegister());     
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " > " + (*($3.registerName))+ ";";   
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(*($1.registerName));
+            tempSet.freeRegister(*($3.registerName));  
         }   
     }
     | EXPR2 LE EXPR2
@@ -669,6 +729,11 @@ EXPR21: EXPR2 EQUAL EXPR2
         }
         else{
             $$.type = BOOLEAN;
+            $$.registerName = new string(tempSet.getRegister());     
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " <= " + (*($3.registerName))+ ";";   
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(*($1.registerName));
+            tempSet.freeRegister(*($3.registerName));  
         }   
     }
     | EXPR2 GE EXPR2
@@ -678,12 +743,23 @@ EXPR21: EXPR2 EQUAL EXPR2
         }
         else{
             $$.type = BOOLEAN;
+            $$.registerName = new string(tempSet.getRegister());     
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " >= " + (*($3.registerName))+ ";";  
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(*($1.registerName));
+            tempSet.freeRegister(*($3.registerName));  
         }   
     }
     | ID_ARR INCREMENT
     {
         if ($1.type == INTEGER) {
-            $$.type = INTEGER;      
+            $$.type = INTEGER;   
+            string newReg = tempSet.getRegister();
+            $$.registerName = new string(newReg);
+            string s = newReg + " = " + (*($1.registerName)) + ";";
+            gen(functionInstruction, s, nextquad);
+            s = (*($1.registerName)) + " = " + newReg + " + 1 ;";
+            gen(functionInstruction, s, nextquad);
         }
         else {
             $$.type = ERRORTYPE;
@@ -693,7 +769,13 @@ EXPR21: EXPR2 EQUAL EXPR2
     | ID_ARR DECREMENT
     {
         if ($1.type == INTEGER) {
-            $$.type = INTEGER;      
+            $$.type = INTEGER;   
+            string newReg = tempSet.getRegister();
+            $$.registerName = new string(newReg);
+            string s = newReg + " = " + (*($1.registerName)) + ";";
+            gen(functionInstruction, s, nextquad);
+            s = (*($1.registerName)) + " = " + newReg + " - 1 ;";
+            gen(functionInstruction, s, nextquad);     
         }
         else {
             $$.type = ERRORTYPE;
@@ -703,7 +785,13 @@ EXPR21: EXPR2 EQUAL EXPR2
     | INCREMENT ID_ARR
     {
         if ($2.type == INTEGER) {
-            $$.type = INTEGER;      
+            $$.type = INTEGER;   
+            string newReg = tempSet.getRegister();
+            $$.registerName = new string(newReg);
+            string s = newReg + " = " + (*($2.registerName)) + " + 1 ;";
+            gen(functionInstruction, s, nextquad);
+            s = (*($2.registerName)) + " = " + newReg + ";";
+            gen(functionInstruction, s, nextquad);      
         }
         else {
             $$.type = ERRORTYPE;
@@ -713,63 +801,162 @@ EXPR21: EXPR2 EQUAL EXPR2
     | DECREMENT ID_ARR
     {
         if ($2.type == INTEGER) {
-            $$.type = INTEGER;      
+            $$.type = INTEGER;   
+            string newReg = tempSet.getRegister();
+            $$.registerName = new string(newReg);
+            string s = newReg + " = " + (*($2.registerName)) + " - 1 ;";
+            gen(functionInstruction, s, nextquad);
+            s = (*($2.registerName)) + " = " + newReg + ";";
+            gen(functionInstruction, s, nextquad);        
         }
         else {
             $$.type = ERRORTYPE;
             cout << "Cannot increment non-integer type variable" << endl; 
         }
     } 
-    | EXPR2 { $$.type = $1.type; }
+    | EXPR2 
+    {
+        $$.type = $1.type; 
+        $$.registerName = new string(*($1.registerName)); 
+        delete $1.registerName;     
+    }
 ;
 
 EXPR2:  EXPR2 PLUS TERM
     {
-        if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
-          $$.type = ERRORTYPE;  
+      if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
+            $$.type = ERRORTYPE; 
+            errorFound = true; 
         }
         else {
             if (arithmeticCompatible($1.type, $3.type)) {
                 $$.type = compareTypes($1.type,$3.type);
+
+                if ($1.type == INTEGER && $3.type == FLOATING) {
+                    string newReg = tempSet.getFloatRegister();
+                    string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ");";
+                    tempSet.freeRegister(*($1.registerName));
+                    $1.registerName = &newReg;
+                    gen(functionInstruction, s, nextquad);
+                }
+                else if ($1.type == FLOATING && $3.type == INTEGER) {
+                    string newReg = tempSet.getFloatRegister();
+                    string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ");";
+                    tempSet.freeRegister(*($3.registerName));
+                    $3.registerName = &newReg;
+                    gen(functionInstruction, s, nextquad);
+                }
+
+                if ($$.type == INTEGER) 
+                    $$.registerName = new string(tempSet.getRegister());
+                else
+                    $$.registerName = new string(tempSet.getFloatRegister());
+                    
+                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " + " + (*($3.registerName))+ ";";;   
+                gen(functionInstruction, s, nextquad);
+                tempSet.freeRegister(*($1.registerName));
+                tempSet.freeRegister(*($3.registerName));   
             }
             else {
                 cout << "Type mismatch in expression" << endl;
                 $$.type = ERRORTYPE;
             }
-        } 
+        }
     }
     | EXPR2 MINUS TERM
     {
         if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
-          $$.type = ERRORTYPE;  
+            $$.type = ERRORTYPE;
+            errorFound = true;  
         }
         else {
             if (arithmeticCompatible($1.type, $3.type)) {
                 $$.type = compareTypes($1.type,$3.type);
+
+                if ($1.type == INTEGER && $3.type == FLOATING) {
+                    string newReg = tempSet.getFloatRegister();
+                    string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ");";
+                    tempSet.freeRegister(*($1.registerName));
+                    $1.registerName = &newReg;
+                    gen(functionInstruction, s, nextquad);
+                }
+                else if ($1.type == FLOATING && $3.type == INTEGER) {
+                    string newReg = tempSet.getFloatRegister();
+                    string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ");";
+                    tempSet.freeRegister(*($3.registerName));
+                    $3.registerName = &newReg;
+                    gen(functionInstruction, s, nextquad);
+                }
+
+                if ($$.type == INTEGER) 
+                    $$.registerName = new string(tempSet.getRegister());
+                else
+                    $$.registerName = new string(tempSet.getFloatRegister());
+                    
+                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " - " + (*($3.registerName))+ ";";;   
+                gen(functionInstruction, s, nextquad);
+                tempSet.freeRegister(*($1.registerName));
+                tempSet.freeRegister(*($3.registerName));   
             }
             else {
                 cout << "Type mismatch in expression" << endl;
                 $$.type = ERRORTYPE;
             }
+        }
+    }
+    | TERM 
+    { 
+        $$.type = $1.type; 
+        if ($1.type == ERRORTYPE) {
+            errorFound = true;
+        }
+        else {
+            $$.registerName = new string(*($1.registerName)); 
+            delete $1.registerName;
         } 
     }
-    | TERM { $$.type = $1.type; }
 ;
 
 TERM: TERM MUL FACTOR
     {
         if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
-          $$.type = ERRORTYPE;  
+            $$.type = ERRORTYPE;  
         }
         else {
             if (arithmeticCompatible($1.type, $3.type)) {
                 $$.type = compareTypes($1.type,$3.type);
+
+                if ($1.type == INTEGER && $3.type == FLOATING) {
+                    string newReg = tempSet.getFloatRegister();
+                    string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ");";
+                    tempSet.freeRegister(*($1.registerName));
+                    $1.registerName = &newReg;
+                    gen(functionInstruction, s, nextquad);
+                }
+                else if ($1.type == FLOATING && $3.type == INTEGER) {
+                    string newReg = tempSet.getFloatRegister();
+                    string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ");";
+                    tempSet.freeRegister(*($3.registerName));
+                    $3.registerName = &newReg;
+                    gen(functionInstruction, s, nextquad);
+                }
+
+                if ($$.type == INTEGER) 
+                    $$.registerName = new string(tempSet.getRegister());
+                else
+                    $$.registerName = new string(tempSet.getFloatRegister());
+                    
+                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " * " + (*($3.registerName))+ ";";;   
+                gen(functionInstruction, s, nextquad);
+                tempSet.freeRegister(*($1.registerName));
+                tempSet.freeRegister(*($3.registerName));   
             }
             else {
                 cout << "Type mismatch in expression" << endl;
                 $$.type = ERRORTYPE;
             }
-        }       
+        }
+   
     }
     | TERM DIV FACTOR  
     {
@@ -779,6 +966,31 @@ TERM: TERM MUL FACTOR
         else {
             if (arithmeticCompatible($1.type, $3.type)) {
                 $$.type = compareTypes($1.type,$3.type);
+
+                if ($1.type == INTEGER && $3.type == FLOATING) {
+                    string newReg = tempSet.getFloatRegister();
+                    string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ");";
+                    tempSet.freeRegister(*($1.registerName));
+                    $1.registerName = &newReg;
+                    gen(functionInstruction, s, nextquad);
+                }
+                else if ($1.type == FLOATING && $3.type == INTEGER) {
+                    string newReg = tempSet.getFloatRegister();
+                    string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ");";
+                    tempSet.freeRegister(*($3.registerName));
+                    $3.registerName = &newReg;
+                    gen(functionInstruction, s, nextquad);
+                }
+
+                if ($$.type == INTEGER) 
+                    $$.registerName = new string(tempSet.getRegister());
+                else
+                    $$.registerName = new string(tempSet.getFloatRegister());
+                    
+                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " / " + (*($3.registerName))+ ";";;   
+                gen(functionInstruction, s, nextquad);
+                tempSet.freeRegister(*($1.registerName));
+                tempSet.freeRegister(*($3.registerName));   
             }
             else {
                 cout << "Type mismatch in expression" << endl;
@@ -786,18 +998,59 @@ TERM: TERM MUL FACTOR
             }
         }   
     } 
-    | FACTOR { $$.type = $1.type; }
+    | FACTOR 
+    { 
+        $$.type = $1.type; 
+        if ($1.type == ERRORTYPE) {
+            errorFound = true;
+        }
+        else {
+            $$.registerName = new string(*($1.registerName)); 
+            delete $1.registerName;
+        } 
+    }
 ;
 
 FACTOR: ID_ARR  
     { 
         $$.type = $1.type;
-        $$.variableList = new string(tempSet.getRegister());
+        if ($$.type == INTEGER)
+            $$.registerName = new string(tempSet.getRegister());
+        else $$.registerName = new string(tempSet.getFloatRegister());
+        string s = (*($$.registerName)) + " = " + (*($1.registerName)) + ";";
+        gen(functionInstruction, s, nextquad);
     }
-    | NUMINT    { $$.type = INTEGER; }
-    | NUMFLOAT  { $$.type = FLOATING; }
-    | FUNC_CALL { $$.type = callFuncPtr->returnType; delete callFuncPtr;}
-    | LP ASG RP { $$.type = $2.type; } 
+    | NUMINT    
+    { 
+        $$.type = INTEGER; 
+        $$.registerName = new string(tempSet.getRegister());
+        string s = (*($$.registerName)) + " = " + string($1) + ";";
+        gen(functionInstruction, s, nextquad);  
+    }
+    | NUMFLOAT  
+    { 
+        $$.type = FLOATING;
+        $$.registerName = new string(tempSet.getFloatRegister());
+        string s = (*($$.registerName)) + " = " + string($1) + ";";
+        gen(functionInstruction, s, nextquad);  
+    }
+    | FUNC_CALL 
+    { 
+        // TODO revert back ehere when funccall is handled
+        $$.type = callFuncPtr->returnType; 
+        delete callFuncPtr;
+    }
+    | LP ASG RP 
+    { 
+        $$.type = $2.type; 
+        if($2.registerName == NULL){
+            cout << "String name in FACTOR : LP ASG RP is empty"<<endl;
+        }
+        else{
+            $$.registerName = new string(*($2.registerName));
+            delete $2.registerName;
+        }
+    } 
 ;
 
 ID_ARR: ID
@@ -809,9 +1062,10 @@ ID_ARR: ID
         if(found){
             if (vn->type == SIMPLE) {
                 $$.type = vn->eleType;
-                // ID_ARR.val = Id.val used for code generation
+                $$.registerName = new string(string($1));
             }
             else {
+                $$.type = ERRORTYPE;
                 cout << $1 << " is declared as an array" << endl; 
             }
         }
@@ -820,13 +1074,15 @@ ID_ARR: ID
             if (found) {
                 if (vn->type == SIMPLE) {
                     $$.type = vn->eleType;
-                    // ID_ARR.val = Id.val used for code generation
+                    $$.registerName = new string(string($1));
                 }
                 else {
+                    $$.type = ERRORTYPE;
                     cout << $1 << " is declared as an array" << endl;
                 }
             }
             else {
+                $$.type = ERRORTYPE;
                 cout << "Undeclared identifier " << $1 << endl;
             }
         }
@@ -839,10 +1095,25 @@ ID_ARR: ID
         searchVariable(string($1), activeFuncPtr, found, vn); 
         if(found){
             if (vn->type == ARRAY) {
-                $$.type = vn->eleType;
-                // ID_ARR.val = Id.val used for code generation
+                if (dimlist.size() == vn->dimlist.size()) {
+                    $$.type = vn->eleType;
+                    // calculate linear address using dimensions then pass to FACTOR
+                    int offset = 0;
+                    for (int i = 0; i < vn->dimlist.size(); i++) {
+                        offset += dimlist[i];
+                        if (i != vn->dimlist.size()-1) offset *= vn->dimlist[i+1];  
+                    }
+                    string os = to_string(offset);
+                    string s = string(*($1.registerName)) + "[" + os + "]";
+                    $$.registerName = new string(s); 
+                }
+                else {
+                    $$.type = ERRORTYPE;
+                    cout << "Dimension mismatch: " << $1 << "should have %d dimensions" << endl;
+                }
             }
             else {
+                $$.type = ERRORTYPE;
                 cout << $1 << " is declared as a singleton" << endl; 
             }
         }
@@ -850,14 +1121,30 @@ ID_ARR: ID
             searchParam(string ($1), activeFuncPtr->parameterList, found, vn);
             if (found) {
                 if (vn->type == ARRAY) {
-                    $$.type = vn->eleType;
-                    // ID_ARR.val = Id.val used for code generation
+                    if (dimlist.size() == vn->dimlist.size()) {
+                        $$.type = vn->eleType;
+                        // calculate linear address using dimensions then pass to FACTOR
+                        int offset = 0;
+                        for (int i = 0; i < vn->dimlist.size(); i++) {
+                            offset += dimlist[i];
+                            if (i != vn->dimlist.size()-1) offset *= vn->dimlist[i+1];  
+                        }
+                        string os = to_string(offset);
+                        string s = *($1.registerName) + "[" + os + "]";
+                        $$.registerName = new string(s); 
+                    }
+                    else {
+                        $$.type = ERRORTYPE;
+                        cout << "Dimension mismatch: " << $1 << "should have %d dimensions" << endl;
+                    }
                 }
                 else {
+                    $$.type = ERRORTYPE;
                     cout << $1 << " is declared as a singleton" << endl;
                 }
             }
             else {
+                $$.type = ERRORTYPE;
                 cout << "Undeclared identifier " << $1 << endl;
             }
         }
@@ -876,5 +1163,15 @@ int main(int argc, char **argv)
 {
     nextquad = 0;
     scope = 0;
+    found = 0;
+    errorFound=false;
+    outinter = fopen("./output/intermediate.txt", "w");
     yyparse();
+    if(!errorFound){
+        for(auto it:functionInstruction){
+            cout<<it<<endl;
+        }
+    } else {
+        cout<<"exited without intermediate code generation"<<endl;
+    }
 }
