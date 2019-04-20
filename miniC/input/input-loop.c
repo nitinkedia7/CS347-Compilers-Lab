@@ -13,5 +13,4 @@ int main(){
     while(j--){
         newarea -= newa*newb;
     }
-    for (;;) {}
 }

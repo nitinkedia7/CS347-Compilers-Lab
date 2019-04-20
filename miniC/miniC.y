@@ -12,7 +12,6 @@ extern char* yytext;
 extern int yyleng;
 void yyerror(char* s);
 
-FILE *outasm, *outinter, *outtemp;
 string text;
 eletype resultType;
 vector<typeRecord*> typeRecordList;
@@ -28,11 +27,9 @@ funcEntry* activeFuncPtr;
 funcEntry* callFuncPtr;
 int scope;
 int found;
-int labelCount;
-
 bool errorFound;
+int numberOfParameters;
 %} 
-
 
 %code requires{
     #include "funcTab.h"
@@ -59,11 +56,10 @@ bool errorFound;
 %type <idName> NUMFLOAT
 %type <idName> NUMINT
 %type <idName> ID
-%type <expr> EXPR2 TERM FACTOR ID_ARR ASG ASG1 EXPR1 EXPR21 CONDITION1 CONDITION2 LHS
-%type <whileexpval> WHILEEXP IFEXP 
-%type <stmtval> BODY WHILESTMT IFSTMT M2
-%type <quad> M1 M3 N3 P3
-
+%type <expr> EXPR2 TERM FACTOR ID_ARR ASG ASG1 EXPR1 EXPR21 CONDITION1 CONDITION2 LHS FUNC_CALL
+%type <whileexpval> WHILEEXP IFEXP N3 P3 Q3 FOREXP
+%type <stmtval> BODY WHILESTMT IFSTMT M2 FORLOOP STMT STMT_LIST
+%type <quad> M1 M3 Q4
 %%
 
 MAIN_PROG: PROG MAINFUNCTION
@@ -80,6 +76,8 @@ MAINFUNCTION: MAIN_HEAD LCB BODY RCB
         deleteVarList(activeFuncPtr, scope);
         activeFuncPtr=NULL;
         scope=0;
+        string s = "function end";
+        gen(functionInstruction, s, nextquad);
     }
 ;
 
@@ -102,6 +100,8 @@ MAIN_HEAD: INT MAIN LP RP
         else {
             addFunction(activeFuncPtr, funcEntryRecord);
             scope = 2; 
+            string s = "function begin main";
+            gen(functionInstruction, s, nextquad);
         }
     }
 ;
@@ -112,6 +112,8 @@ FUNC_DEF: FUNC_HEAD LCB BODY RCB
         deleteVarList(activeFuncPtr, scope);
         activeFuncPtr=NULL;
         scope=0;
+        string s = "function end";
+        gen(functionInstruction, s, nextquad);
     }
 ;
 
@@ -129,6 +131,8 @@ FUNC_HEAD: RES_ID LP DECL_PLIST RP
         else{
             addFunction(activeFuncPtr, funcEntryRecord);
             scope = 2; 
+            string s = "function begin " + activeFuncPtr->name + ": ";
+            gen(functionInstruction, s, nextquad);
         }
     }
 ;
@@ -174,7 +178,6 @@ DECL_PL: DECL_PL COMMA DECL_PARAM
             typeRecordList.push_back(varRecord);
         }
     }
-    
 ;
 
 DECL_PARAM: T ID
@@ -189,37 +192,119 @@ DECL_PARAM: T ID
 ;
 
 BODY: STMT_LIST
+    {
+        $$.nextList = new vector<int>;
+        merge($$.nextList, $1.nextList);
+        $$.breakList = new vector<int>;
+        merge($$.breakList, $1.breakList);
+        $$.continueList = new vector<int>;
+        merge($$.continueList, $1.continueList);
+    }
     | %empty
 ;
 
 STMT_LIST: STMT_LIST STMT 
+        {
+            $$.nextList = new vector<int>;
+            merge($$.nextList, $1.nextList);
+             merge($$.nextList, $2.nextList);
+            $$.breakList = new vector<int>;
+            merge($$.breakList, $1.breakList);
+            merge($$.breakList, $2.breakList);
+            $$.continueList = new vector<int>;
+            merge($$.continueList, $1.continueList);
+            merge($$.continueList, $2.continueList);
+        }
     | STMT 
+    {
+        $$.nextList = new vector<int>;
+        merge($$.nextList, $1.nextList);
+        $$.breakList = new vector<int>;
+        merge($$.breakList, $1.breakList);
+        $$.continueList = new vector<int>;
+        merge($$.continueList, $1.continueList);
+    }
 ;
 
-STMT: VAR_DECL
+STMT: VAR_DECL{
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+}
     | ASG SEMI
-    | FORLOOP
-    | IFSTMT
-    | WHILESTMT
-    | SWITCHCASE
+    {
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+        if ($1.type != NULLVOID && $1.type != ERRORTYPE)
+            tempSet.freeRegister(*($1.registerName));
+    } 
+    | FORLOOP{
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+    }
+    | IFSTMT{
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+    }
+    | WHILESTMT{
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+    }
+    | SWITCHCASE{
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+    }
     | LCB {scope++;} BODY RCB 
     {
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
         deleteVarList(activeFuncPtr, scope);
         scope--;
     }
-    | BREAK SEMI
-    | CONTINUE SEMI
-    | RETURN ASG1 SEMI 
+    | BREAK SEMI{
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+        $$.breakList->push_back(nextquad);  
+        gen(functionInstruction, "goto L", nextquad);      
+    }
+    | CONTINUE SEMI{
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+        $$.continueList->push_back(nextquad);
+        gen(functionInstruction, "goto L", nextquad);
+    }
+    | RETURN ASG SEMI 
     {
-        if(activeFuncPtr->returnType == NULLVOID && ($2.type != NULLVOID)){
-            cout<<"The function "<< activeFuncPtr->name<<" has no return type"<<endl;
-        }
-        else if(activeFuncPtr->returnType != NULLVOID && ($2.type == NULLVOID || $2.type == ERRORTYPE)){
-            cout<<"The function "<< activeFuncPtr->name<<" must have a"<<" return type"<<endl;
-        }
-        else{
-
-        }
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+        if ($2.type != ERRORTYPE) {
+            if (activeFuncPtr->returnType == NULLVOID && $2.type != NULLVOID) {
+                cout<<"The function "<< activeFuncPtr->name<<" has void return type"<<endl;
+            }
+            else if (activeFuncPtr->returnType != NULLVOID && $2.type == NULLVOID) {
+                cout<<"The function "<< activeFuncPtr->name<<" must have a"<<" return type"<<endl;
+            }
+            else {
+                string s;
+                if ($2.type != NULLVOID) {
+                    s = "return " + (*($2.registerName)) + ";";
+                    tempSet.freeRegister(*($2.registerName));
+                }
+                else {
+                    s = "return;";
+                }
+                gen(functionInstruction, s, nextquad);
+            }
+        }   
     }
 ;
 
@@ -335,6 +420,7 @@ DEC_ID_ARR: ID
                 varRecord->type = ARRAY;
                 varRecord->tag = VARIABLE;
                 varRecord->scope = scope;
+                varRecord->dimlist = dimlist;
                 // cout<<"variable name: "<<varRecord->name<<endl;
                 typeRecordList.push_back(varRecord);
             }
@@ -346,10 +432,10 @@ DEC_ID_ARR: ID
             varRecord->tag = VARIABLE;
             varRecord->scope = scope;
             varRecord->dimlist = dimlist;
-            dimlist.clear();
             typeRecordList.push_back(varRecord);
-        }  
-    }
+        }
+        dimlist.clear();  
+    } 
 ;
 
 BR_DIMLIST: LSB NUMINT RSB
@@ -368,24 +454,38 @@ FUNC_CALL: ID LP PARAMLIST RP
         callFuncPtr->name = string($1);
         callFuncPtr->parameterList = typeRecordList;
         callFuncPtr->numOfParam = typeRecordList.size();
-        typeRecordList.clear();
         int found = 0;
         // printFunction(activeFuncPtr);
         // printFunction(callFuncPtr);
         compareFunc(callFuncPtr,funcEntryRecord,found);
-        if(found == 0){
-            cout<<"No function with name --"<<string($1)<<"-- exits"<<endl;
+        $$.type = ERRORTYPE;
+        if (found == 0) {
+            cout << "No function with name " << string($1) << " exists" << endl;
         }
-        else if(found == -1){
-            cout <<"Parameter list does not match with declared function paramters"<<endl;
+        else if (found == -1) {
+            cout << "Parameter list does not match with defined paramters of function " << string($1) << endl;
         }
-        else{
-            // to do when funtion is called correctly
-            // cout<<"YESSS"<<endl;
+        else {
+            $$.type = callFuncPtr->returnType;
+            for(auto it : typeRecordList){
+                cout << "param " << it->name <<" ;" << endl;   
+                tempSet.freeRegister(it->name);
+            }
+            int isRefParam = 0;
+            if(callFuncPtr->returnType == INTEGER){
+                $$.registerName = new string(tempSet.getRegister());
+                isRefParam++;
+            }
+            else if(callFuncPtr->returnType == FLOATING){
+                $$.registerName = new string(tempSet.getFloatRegister());
+                isRefParam++;
+            }
+            cout << "refparam " << (*($$.registerName)) << " ;" << endl;
+            cout << "call " << callFuncPtr->name << ", " << typeRecordList.size() + isRefParam << " ; " << endl;
         }
+        typeRecordList.clear();
     }
 ;
-
 
 PARAMLIST: PLIST 
     | %empty 
@@ -395,12 +495,20 @@ PLIST: PLIST COMMA ASG
     {
         varRecord = new typeRecord;
         varRecord->eleType = $3.type;
+        if ($3.type != ERRORTYPE) {
+            varRecord->name = *($3.registerName);
+            varRecord->type = SIMPLE;
+        }
         typeRecordList.push_back(varRecord);
     }
     | ASG
     {
         varRecord = new typeRecord;
         varRecord->eleType = $1.type;
+        if ($1.type != ERRORTYPE) {
+            varRecord->name = *($1.registerName);
+            varRecord->type = SIMPLE; 
+        }
         typeRecordList.push_back(varRecord);
     }
 ;
@@ -408,73 +516,57 @@ PLIST: PLIST COMMA ASG
 ASG: CONDITION1
     {
         $$.type = $1.type;
+        if($$.type != ERRORTYPE) {
+            $$.registerName = $1.registerName;
+        }
     }
     | LHS ASSIGN ASG
     {
-        if($3.type == NULLVOID || $3.type==ERRORTYPE){
-            cout<<"Can't assign void to int or float"<<endl;
+        if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
             $$.type = ERRORTYPE;
+            errorFound = true;
         }
-        else{
+        else if ($3.type == NULLVOID) {
+            cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
+            $$.type = ERRORTYPE;
+            errorFound = true;
+        }
+        else {
             $$.type = $1.type;
+            string registerName;
+            if ($1.type == INTEGER && $3.type == FLOATING) {
+                registerName = tempSet.getRegister();
+                string s = registerName + " = convertToInt(" + (*($3.registerName)) + ");";   
+                gen(functionInstruction, s, nextquad);
+                tempSet.freeRegister(*($3.registerName));
+            }
+            else if($1.type == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
+                registerName = tempSet.getFloatRegister();
+                string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ");";   
+                gen(functionInstruction, s, nextquad); 
+                tempSet.freeRegister(*($3.registerName));
+            }
+            else {
+                registerName = *($3.registerName);
+            }
+            string s = (*($1.registerName)) + " = " + registerName + ";";
+            gen(functionInstruction, s, nextquad);
+            $$.registerName = new string(registerName);
         }
-        
     }
     | LHS PLUSASG ASG
-    {
-        if($3.type == NULLVOID || $3.type==ERRORTYPE){
-            cout<<"Can't assign void to int or float"<<endl;
-            $$.type = ERRORTYPE;
-        }
-        else{
-            $$.type = $1.type;
-        }
-    }
     | LHS MINASG ASG
-    {
-        if($3.type == NULLVOID || $3.type==ERRORTYPE){
-            cout<<"Can't assign void to int or float"<<endl;
-            $$.type = ERRORTYPE;
-        }
-        else{
-            $$.type = $1.type;
-        }
-    }
     | LHS MULASG ASG
-    {
-        if($3.type == NULLVOID || $3.type==ERRORTYPE){
-            cout<<"Can't assign void to int or float"<<endl;
-            $$.type = ERRORTYPE;
-        }
-        else{
-            $$.type = $1.type;
-        }
-    }
     | LHS DIVASG ASG
-    {
-        if($3.type == NULLVOID || $3.type==ERRORTYPE){
-            cout<<"Can't assign void to int or float"<<endl;
-            $$.type = ERRORTYPE;
-        }
-        else{
-            $$.type = $1.type;
-        }
-    }
     | LHS MODASG ASG
-    {
-        if($3.type == NULLVOID || $3.type==ERRORTYPE){
-            cout<<"Can't assign void to int or float"<<endl;
-            $$.type = ERRORTYPE;
-        }
-        else{
-            $$.type = $1.type;
-        }
-    }
 ;
 
 LHS: ID_ARR  
     {
         $$.type = $1.type;
+        if ($$.type != ERRORTYPE) {
+            $$.registerName = $1.registerName;
+        } 
     } 
 ;
 
@@ -490,26 +582,82 @@ CASELIST:   CASE CONDITION1 COLON BODY CASELIST
     | DEFAULT COLON BODY
 ;
 
-FORLOOP: FOREXP LCB BODY RCB
-    {
-        deleteVarList(activeFuncPtr, scope);
-        scope--;
+M3: %empty { 
+        $$ = nextquad;
+        gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad); 
     }
 ;
 
-FOREXP: FOR LP ASG1 SEMI M3 ASG1 SEMI N3 ASG1 P3 RP
+N3: %empty { 
+    $$.begin = nextquad; 
+    $$.falseList = new vector<int>;
+    $$.falseList->push_back(nextquad);
+    gen(functionInstruction, "goto L", nextquad);
+    }
+;
+
+P3: %empty { 
+    $$.falseList = new vector<int>;
+    $$.falseList->push_back(nextquad);
+    gen(functionInstruction, "goto L", nextquad);
+    $$.begin = nextquad; 
+    gen(functionInstruction, "L"+to_string(nextquad)+":", nextquad);
+    }
+;
+
+Q3: %empty
     {
-        
+        $$.begin = nextquad;
+        $$.falseList = new vector<int>;
+        $$.falseList->push_back(nextquad);
+    }
+;
+
+Q4: %empty
+    {
+        $$ = nextquad;
+    }
+;
+
+FORLOOP: FOREXP Q4 LCB BODY RCB
+    {
+        deleteVarList(activeFuncPtr, scope);
+        scope--;
+        gen(functionInstruction, "goto L" + to_string($1.begin), nextquad); 
+        merge($1.falseList,$4.breakList);
+        backpatch($4.continueList,$1.begin, functionInstruction);
+        backpatch($1.falseList, nextquad, functionInstruction);
+        gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad); 
+    }
+;
+
+FOREXP: FOR LP ASG1 SEMI M3 ASG1 Q3 {
+        if($6.type!=NULLVOID){
+            gen(functionInstruction, "if "+ (*($6.registerName)) + " == 0 goto L", nextquad);
+        }
+    } P3 SEMI ASG1 N3 RP 
+    {
+        backpatch($12.falseList,$5,functionInstruction);
+        backpatch($9.falseList,nextquad,functionInstruction);
+        gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad); 
+        $$.falseList = new vector<int>;
+        $$.falseList->push_back($7.begin);
+        $$.begin = $9.begin;
         scope++;
+        tempSet.freeRegister(*($3.registerName));
+        tempSet.freeRegister(*($6.registerName));
+        tempSet.freeRegister(*($11.registerName));
     }
 ;
 
 ASG1: ASG
     {
         $$.type= $1.type;
+        if ($$.type == ERRORTYPE) {
+            $$.registerName = $1.registerName;
+        }
     }
-    | %empty
-    {
+    | %empty {
         $$.type = NULLVOID;
     }
 ;
@@ -523,53 +671,70 @@ M1: %empty
 
 M2: %empty
     {
+        $$.nextList = new vector<int>;
         ($$.nextList)->push_back(nextquad);
-        gen(functionInstruction, "goto ", nextquad);
+        gen(functionInstruction, "goto L", nextquad);
     }
 ;
 
-M3: %empty { $$ = nextquad; }
-;
-N3: %empty { $$ = nextquad; }
-;
-P3: %empty { $$ = nextquad; }
-;
-
-
 IFSTMT: IFEXP LCB BODY RCB 
     {
+        // cout<<"Test1"<<endl;
         deleteVarList(activeFuncPtr,scope);
+        // cout<<"Test2"<<endl;
         scope--;
+        $$.nextList= new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList= new vector<int>;
         merge($$.nextList, $1.falseList);
+        // cout<<"Test5"<<endl;
         merge($$.breakList, $3.breakList);
+        // cout<<"Test6"<<endl;
         merge($$.continueList, $3.continueList);
+        // cout<<"Test3"<<endl;
         backpatch($$.nextList,nextquad,functionInstruction);
+        // cout<<"Test4"<<endl;
         gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
     }
     | IFEXP LCB BODY RCB {deleteVarList(activeFuncPtr,scope);} M2 ELSE M1 LCB BODY RCB
     {
         deleteVarList(activeFuncPtr,scope);
         scope--;
+        $$.nextList= new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList= new vector<int>;
         backpatch($1.falseList,$8,functionInstruction);
+        // cout<<"test6"<<endl;
         merge($$.nextList,$6.nextList );
+        // cout<<"test7"<<endl;
         backpatch($$.nextList,nextquad,functionInstruction);
+        // cout<<"test8"<<endl;
         gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+        // cout<<"test9"<<endl;
         merge($$.breakList, $3.breakList);
+        // cout<<"test10"<<endl;
         merge($$.continueList, $3.continueList);
+        // cout<<"test11"<<endl;
         merge($$.breakList, $10.breakList);
+        // cout<<"test12"<<endl;
         merge($$.continueList, $10.continueList);
+        // cout<<"test13"<<endl;
     }
 ;
 
 IFEXP: IF LP ASG RP 
     {
-        $$.falseList->push_back(nextquad);
-        if($3.type == NULLVOID){
-            cout<<"Expression in if statement can't be empty"<<endl;
-            errorFound=true;
-        }
-        gen(functionInstruction, "if "+ (*($3.registerName)) + " == 0 goto ", nextquad);
-        scope++;
+        if($3.type != ERRORTYPE && $3.type!=NULLVOID){
+            $$.falseList = new vector <int>;
+            $$.falseList->push_back(nextquad);
+            if($3.type == NULLVOID){
+                cout<<"Expression in if statement can't be empty"<<endl;
+                errorFound=true;
+            }
+            gen(functionInstruction, "if "+ (*($3.registerName)) + " == 0 goto L", nextquad);
+            scope++;
+            tempSet.freeRegister(*($3.registerName));
+        } 
     }
 ;
 
@@ -581,6 +746,7 @@ WHILESTMT:  WHILEEXP LCB BODY RCB
         gen(functionInstruction, "goto L" + to_string($1.begin), nextquad);
         backpatch($3.nextList, $1.begin, functionInstruction);
         backpatch($3.continueList, $1.begin, functionInstruction);
+        $$.nextList = new vector<int>;
         merge($$.nextList, $1.falseList);
         merge($$.nextList, $3.breakList);
         backpatch($$.nextList,nextquad,functionInstruction);
@@ -590,15 +756,17 @@ WHILESTMT:  WHILEEXP LCB BODY RCB
 
 WHILEEXP: WHILE M1 LP ASG RP
     {
-        if($4.type == NULLVOID){
+        scope++;
+        if($4.type == NULLVOID || $4.type == ERRORTYPE){
             cout<<"Expression in if statement can't be empty"<<endl;
             errorFound = true;
         }
-        scope++;
-        
-        ($$.falseList)->push_back(nextquad);
-        gen(functionInstruction, "if " + *($4.registerName) + "== 0 goto ", nextquad);
-        $$.begin = $2; 
+        else{
+            $$.falseList = new vector<int>;
+            ($$.falseList)->push_back(nextquad);
+            gen(functionInstruction, "if " + *($4.registerName) + "== 0 goto L", nextquad);
+            $$.begin = $2; 
+        }
     }
 ;
 
@@ -758,7 +926,7 @@ EXPR21: EXPR2 EQUAL EXPR2
             $$.registerName = new string(newReg);
             string s = newReg + " = " + (*($1.registerName)) + ";";
             gen(functionInstruction, s, nextquad);
-            s = (*($1.registerName)) + " = " + newReg + " + 1 ;";
+            s = (*($1.registerName)) + " = " + newReg + " + 1;";
             gen(functionInstruction, s, nextquad);
         }
         else {
@@ -774,7 +942,7 @@ EXPR21: EXPR2 EQUAL EXPR2
             $$.registerName = new string(newReg);
             string s = newReg + " = " + (*($1.registerName)) + ";";
             gen(functionInstruction, s, nextquad);
-            s = (*($1.registerName)) + " = " + newReg + " - 1 ;";
+            s = (*($1.registerName)) + " = " + newReg + " - 1;";
             gen(functionInstruction, s, nextquad);     
         }
         else {
@@ -788,7 +956,7 @@ EXPR21: EXPR2 EQUAL EXPR2
             $$.type = INTEGER;   
             string newReg = tempSet.getRegister();
             $$.registerName = new string(newReg);
-            string s = newReg + " = " + (*($2.registerName)) + " + 1 ;";
+            string s = newReg + " = " + (*($2.registerName)) + " + 1;";
             gen(functionInstruction, s, nextquad);
             s = (*($2.registerName)) + " = " + newReg + ";";
             gen(functionInstruction, s, nextquad);      
@@ -804,7 +972,7 @@ EXPR21: EXPR2 EQUAL EXPR2
             $$.type = INTEGER;   
             string newReg = tempSet.getRegister();
             $$.registerName = new string(newReg);
-            string s = newReg + " = " + (*($2.registerName)) + " - 1 ;";
+            string s = newReg + " = " + (*($2.registerName)) + " - 1;";
             gen(functionInstruction, s, nextquad);
             s = (*($2.registerName)) + " = " + newReg + ";";
             gen(functionInstruction, s, nextquad);        
@@ -956,7 +1124,6 @@ TERM: TERM MUL FACTOR
                 $$.type = ERRORTYPE;
             }
         }
-   
     }
     | TERM DIV FACTOR  
     {
@@ -1036,19 +1203,25 @@ FACTOR: ID_ARR
     }
     | FUNC_CALL 
     { 
-        // TODO revert back ehere when funccall is handled
-        $$.type = callFuncPtr->returnType; 
-        delete callFuncPtr;
+        // TODO
+        $$.type = $1.type; 
+        if($1.type != ERRORTYPE && $1.type != NULLVOID){
+            $$.registerName = $1.registerName;
+            delete callFuncPtr;
+        }
     }
     | LP ASG RP 
     { 
         $$.type = $2.type; 
-        if($2.registerName == NULL){
-            cout << "String name in FACTOR : LP ASG RP is empty"<<endl;
-        }
-        else{
-            $$.registerName = new string(*($2.registerName));
-            delete $2.registerName;
+        // if($2.registerName == NULL){
+        //     cout << "String name in FACTOR : LP ASG RP is empty"<<endl;
+        // }
+        // else{
+        //     $$.registerName = new string(*($2.registerName));
+        //     delete $2.registerName;
+        // }
+        if ($2.type != ERRORTYPE) {
+            $$.registerName = $2.registerName;
         }
     } 
 ;
@@ -1104,12 +1277,16 @@ ID_ARR: ID
                         if (i != vn->dimlist.size()-1) offset *= vn->dimlist[i+1];  
                     }
                     string os = to_string(offset);
-                    string s = string(*($1.registerName)) + "[" + os + "]";
+                    string s = string($1) + "[" + os + "]";
                     $$.registerName = new string(s); 
                 }
                 else {
                     $$.type = ERRORTYPE;
-                    cout << "Dimension mismatch: " << $1 << "should have %d dimensions" << endl;
+                    for (auto it : dimlist) {
+                        cout << it << " "; 
+                    }
+                    cout << endl;
+                    cout << "Dimension mismatch: " << $1 << " should have " << dimlist.size() <<" dimensions" << endl;
                 }
             }
             else {
@@ -1130,7 +1307,7 @@ ID_ARR: ID
                             if (i != vn->dimlist.size()-1) offset *= vn->dimlist[i+1];  
                         }
                         string os = to_string(offset);
-                        string s = *($1.registerName) + "[" + os + "]";
+                        string s = string($1) + "[" + os + "]";
                         $$.registerName = new string(s); 
                     }
                     else {
@@ -1148,6 +1325,7 @@ ID_ARR: ID
                 cout << "Undeclared identifier " << $1 << endl;
             }
         }
+        dimlist.clear();
     }
 ;
 
@@ -1161,17 +1339,35 @@ void yyerror(char *s)
 
 int main(int argc, char **argv)
 {
+    dimlist.clear();
     nextquad = 0;
     scope = 0;
     found = 0;
     errorFound=false;
-    outinter = fopen("./output/intermediate.txt", "w");
+    
+    if( remove( "tempInter.txt" ) != 0 )
+    {
+        cout<<"Error deleting file";
+    }
+    else{
+        cout<<"File successfully deleted";
+    }
     yyparse();
+    if( remove( "./output/intermediate.txt" ) != 0 )
+    {
+        cout<<"Error deleting file";
+    }
+    else{
+        cout<<"File successfully deleted";
+    }
+    ofstream outinter;
+    outinter.open("./output/intermediate.txt");
     if(!errorFound){
         for(auto it:functionInstruction){
-            cout<<it<<endl;
+            outinter<<it<<endl;
         }
     } else {
         cout<<"exited without intermediate code generation"<<endl;
     }
+    outinter.close();
 }

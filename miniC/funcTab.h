@@ -13,13 +13,21 @@ struct expression{
 
 struct stmt {
     vector<int> *nextList;
-    vector<int> *continueList;
     vector<int> *breakList;
+    vector<int> *continueList;
+    // stmt(){
+    //     this->nextList = new vector<int>;
+    //     this->continueList = new vector<int>;
+    //     this->breakList = new vector<int>;
+    // }
 };
 
 struct whileexp {
     int begin;
     vector<int> *falseList;
+    // whileexp(){
+    //     this->falseList = new vector<int>;
+    // }
 };
 
 struct typeRecord {
@@ -28,7 +36,8 @@ struct typeRecord {
     eletype eleType;
     Tag tag;
     int scope;
-    vector<int> dimlist; // cube[x][y][z] => (x -> y -> z)     
+    vector<int> dimlist; // cube[x][y][z] => (x -> y -> z)
+
 }; 
 
 struct funcEntry {
@@ -52,3 +61,4 @@ void printList(vector<funcEntry*> &funcEntryRecord);
 void printFunction(funcEntry* &activeFuncPtr);
 bool arithmeticCompatible(eletype type1, eletype type2);
 eletype compareTypes(eletype type1, eletype type2);
+

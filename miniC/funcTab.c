@@ -64,9 +64,9 @@ void searchFunc(funcEntry* activeFuncPtr, vector<funcEntry*> &funcEntryRecord, i
             int flag=1;
             for(int i=0;i<it->numOfParam;i++){
                 if((it->parameterList[i])->eleType != activeFuncPtr->parameterList[i]->eleType){
-                     found=-1;
-                     flag=0;
-                     break;
+                    found=-1;
+                    flag=0;
+                    break;
                 }
             }
             if(flag == 1){
@@ -75,8 +75,7 @@ void searchFunc(funcEntry* activeFuncPtr, vector<funcEntry*> &funcEntryRecord, i
             } 
         }
     }
-    if(found != -1)
-        found=0;
+    if (found != -1) found=0;
     return;    
 }
 
@@ -86,9 +85,9 @@ void compareFunc(funcEntry* &activeFuncPtr, vector<funcEntry*> &funcEntryRecord,
             int flag=1;
             for(int i=0;i<it->numOfParam;i++){
                 if((it->parameterList[i])->eleType != activeFuncPtr->parameterList[i]->eleType){
-                     found=-1;
-                     flag=0;
-                     break;
+                    found=-1;
+                    flag=0;
+                    break;
                 }
             }
             if(flag == 1){
@@ -98,8 +97,7 @@ void compareFunc(funcEntry* &activeFuncPtr, vector<funcEntry*> &funcEntryRecord,
             } 
         }
     }
-    if(found != -1)
-        found=0;
+    if (found != -1) found=0;
     return;    
 }
 
@@ -156,3 +154,4 @@ eletype compareTypes(eletype type1, eletype type2) {
     }
     else return NULLVOID;
 }
+

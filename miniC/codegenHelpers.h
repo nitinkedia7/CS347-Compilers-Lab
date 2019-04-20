@@ -9,11 +9,11 @@ private:
 public:
     registerSet(){
         tempRegister.clear();
-        for(int i=0; i<10; i++){
+        for(int i=9; i>=0; i--){
             tempRegister.push_back(i);
         }
         floatRegister.clear();
-        for(int i=0; i<32; i++){
+        for(int i=31; i>=0; i--){
             floatRegister.push_back(i);
         }
     }
@@ -22,6 +22,7 @@ public:
     void freeRegister(string s);
 };
 
+
 void gen(vector<string> &, string ,int &);
-void backpatch(vector<int> *, int, vector<string> &);
-void merge(vector<int> *, vector<int> *);
+void backpatch(vector<int> *&, int, vector<string> &);
+void merge(vector<int> *&, vector<int> *&);
