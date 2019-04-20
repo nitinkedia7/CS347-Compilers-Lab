@@ -1,8 +1,0 @@
-int main(){
-    int a;
-    a = 3;
-    int f;
-    f = 0;
-    int b;
-    b = a++ || f==0;
-}

@@ -468,7 +468,7 @@ FUNC_CALL: ID LP PARAMLIST RP
         else {
             $$.type = callFuncPtr->returnType;
             for(auto it : typeRecordList){
-                cout << "param " << it->name <<" ;" << endl;   
+                gen(functionInstruction, "param " + it->name + ";", nextquad);   
                 tempSet.freeRegister(it->name);
             }
             int isRefParam = 0;
@@ -480,14 +480,14 @@ FUNC_CALL: ID LP PARAMLIST RP
                 $$.registerName = new string(tempSet.getFloatRegister());
                 isRefParam++;
             }
-            cout << "refparam " << (*($$.registerName)) << " ;" << endl;
-            cout << "call " << callFuncPtr->name << ", " << typeRecordList.size() + isRefParam << " ; " << endl;
+            gen(functionInstruction, "refparam " + (*($$.registerName)) + ";", nextquad);
+            gen(functionInstruction, "call " + callFuncPtr->name + ", " + to_string(typeRecordList.size() + isRefParam )+ "; ", nextquad);            
         }
         typeRecordList.clear();
     }
 ;
 
-PARAMLIST: PLIST 
+PARAMLIST: PLIST
     | %empty 
 ;
 
@@ -641,12 +641,21 @@ FOREXP: FOR LP ASG1 SEMI M3 ASG1 Q3 {
         backpatch($9.falseList,nextquad,functionInstruction);
         gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad); 
         $$.falseList = new vector<int>;
-        $$.falseList->push_back($7.begin);
+        if($6.type!=NULLVOID){
+            $$.falseList->push_back($7.begin);            
+        }
         $$.begin = $9.begin;
         scope++;
+        if($3.type!=NULLVOID){
+            tempSet.freeRegister(*($3.registerName));
+        }
         tempSet.freeRegister(*($3.registerName));
-        tempSet.freeRegister(*($6.registerName));
-        tempSet.freeRegister(*($11.registerName));
+        if($6.type!=NULLVOID){
+            tempSet.freeRegister(*($6.registerName));
+        }
+        if($11.type!=NULLVOID){
+            tempSet.freeRegister(*($11.registerName));
+        }
     }
 ;
 
@@ -917,70 +926,6 @@ EXPR21: EXPR2 EQUAL EXPR2
             tempSet.freeRegister(*($1.registerName));
             tempSet.freeRegister(*($3.registerName));  
         }   
-    }
-    | ID_ARR INCREMENT
-    {
-        if ($1.type == INTEGER) {
-            $$.type = INTEGER;   
-            string newReg = tempSet.getRegister();
-            $$.registerName = new string(newReg);
-            string s = newReg + " = " + (*($1.registerName)) + ";";
-            gen(functionInstruction, s, nextquad);
-            s = (*($1.registerName)) + " = " + newReg + " + 1;";
-            gen(functionInstruction, s, nextquad);
-        }
-        else {
-            $$.type = ERRORTYPE;
-            cout << "Cannot increment non-integer type variable" << endl; 
-        }
-    } 
-    | ID_ARR DECREMENT
-    {
-        if ($1.type == INTEGER) {
-            $$.type = INTEGER;   
-            string newReg = tempSet.getRegister();
-            $$.registerName = new string(newReg);
-            string s = newReg + " = " + (*($1.registerName)) + ";";
-            gen(functionInstruction, s, nextquad);
-            s = (*($1.registerName)) + " = " + newReg + " - 1;";
-            gen(functionInstruction, s, nextquad);     
-        }
-        else {
-            $$.type = ERRORTYPE;
-            cout << "Cannot increment non-integer type variable" << endl; 
-        }
-    } 
-    | INCREMENT ID_ARR
-    {
-        if ($2.type == INTEGER) {
-            $$.type = INTEGER;   
-            string newReg = tempSet.getRegister();
-            $$.registerName = new string(newReg);
-            string s = newReg + " = " + (*($2.registerName)) + " + 1;";
-            gen(functionInstruction, s, nextquad);
-            s = (*($2.registerName)) + " = " + newReg + ";";
-            gen(functionInstruction, s, nextquad);      
-        }
-        else {
-            $$.type = ERRORTYPE;
-            cout << "Cannot increment non-integer type variable" << endl; 
-        }
-    } 
-    | DECREMENT ID_ARR
-    {
-        if ($2.type == INTEGER) {
-            $$.type = INTEGER;   
-            string newReg = tempSet.getRegister();
-            $$.registerName = new string(newReg);
-            string s = newReg + " = " + (*($2.registerName)) + " - 1;";
-            gen(functionInstruction, s, nextquad);
-            s = (*($2.registerName)) + " = " + newReg + ";";
-            gen(functionInstruction, s, nextquad);        
-        }
-        else {
-            $$.type = ERRORTYPE;
-            cout << "Cannot increment non-integer type variable" << endl; 
-        }
     } 
     | EXPR2 
     {
@@ -1165,6 +1110,26 @@ TERM: TERM MUL FACTOR
             }
         }   
     } 
+    | TERM MOD FACTOR
+    {
+        if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
+          $$.type = ERRORTYPE;  
+        }
+        else {
+            if ($1.type == INTEGER && $3.type == INTEGER) {
+                $$.type = INTEGER;
+                $$.registerName = new string(tempSet.getRegister());  
+                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " % " + (*($3.registerName))+ ";";;   
+                gen(functionInstruction, s, nextquad);
+                tempSet.freeRegister(*($1.registerName));
+                tempSet.freeRegister(*($3.registerName));   
+            }
+            else {
+                cout << "Type mismatch in expression" << endl;
+                $$.type = ERRORTYPE;
+            }
+        }   
+    }
     | FACTOR 
     { 
         $$.type = $1.type; 
@@ -1213,17 +1178,74 @@ FACTOR: ID_ARR
     | LP ASG RP 
     { 
         $$.type = $2.type; 
-        // if($2.registerName == NULL){
-        //     cout << "String name in FACTOR : LP ASG RP is empty"<<endl;
-        // }
-        // else{
-        //     $$.registerName = new string(*($2.registerName));
-        //     delete $2.registerName;
-        // }
         if ($2.type != ERRORTYPE) {
             $$.registerName = $2.registerName;
         }
+    }
+    | ID_ARR INCREMENT
+    {
+        if ($1.type == INTEGER) {
+            $$.type = INTEGER;   
+            string newReg = tempSet.getRegister();
+            $$.registerName = new string(newReg);
+            string s = newReg + " = " + (*($1.registerName)) + ";";
+            gen(functionInstruction, s, nextquad);
+            s = (*($1.registerName)) + " = " + newReg + " + 1;";
+            gen(functionInstruction, s, nextquad);
+        }
+        else {
+            $$.type = ERRORTYPE;
+            cout << "Cannot increment non-integer type variable" << endl; 
+        }
     } 
+    | ID_ARR DECREMENT
+    {
+        if ($1.type == INTEGER) {
+            $$.type = INTEGER;   
+            string newReg = tempSet.getRegister();
+            $$.registerName = new string(newReg);
+            string s = newReg + " = " + (*($1.registerName)) + ";";
+            gen(functionInstruction, s, nextquad);
+            s = (*($1.registerName)) + " = " + newReg + " - 1;";
+            gen(functionInstruction, s, nextquad);     
+        }
+        else {
+            $$.type = ERRORTYPE;
+            cout << "Cannot increment non-integer type variable" << endl; 
+        }
+    } 
+    | INCREMENT ID_ARR
+    {
+        if ($2.type == INTEGER) {
+            $$.type = INTEGER;   
+            string newReg = tempSet.getRegister();
+            $$.registerName = new string(newReg);
+            string s = newReg + " = " + (*($2.registerName)) + " + 1;";
+            gen(functionInstruction, s, nextquad);
+            s = (*($2.registerName)) + " = " + newReg + ";";
+            gen(functionInstruction, s, nextquad);      
+        }
+        else {
+            $$.type = ERRORTYPE;
+            cout << "Cannot increment non-integer type variable" << endl; 
+        }
+    } 
+    | DECREMENT ID_ARR
+    {
+        if ($2.type == INTEGER) {
+            $$.type = INTEGER;   
+            string newReg = tempSet.getRegister();
+            $$.registerName = new string(newReg);
+            string s = newReg + " = " + (*($2.registerName)) + " - 1;";
+            gen(functionInstruction, s, nextquad);
+            s = (*($2.registerName)) + " = " + newReg + ";";
+            gen(functionInstruction, s, nextquad);        
+        }
+        else {
+            $$.type = ERRORTYPE;
+            cout << "Cannot increment non-integer type variable" << endl; 
+        }
+    }
 ;
 
 ID_ARR: ID

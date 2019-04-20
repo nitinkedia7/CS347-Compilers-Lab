@@ -1,21 +1,16 @@
-
-int gcd(int a, int c, int b) {
-    int e, d;
-    c = a;
-    d = b;
-    float e;
-    float f;
-    if (a < b) {
-        c = c + d;
+int gcd(int a, int b){
+    if(b==0){
+        return a;
+    } else {
+        return gcd(b, a%b);
     }
-    if (b == 0) {
-        return gcd(a,b,f);
-    }
-    return a;
 }
 
 int main() {
-    int x;
-    x = gcd(10, 2, 1);
-    return 0;
+    int a, b;
+    a = 45;
+    b = 90;
+    int c;
+    c = gcd(a, b);
+    return 1; 
 }
