@@ -12,6 +12,7 @@ extern char* yytext;
 extern int yyleng;
 void yyerror(char* s);
 
+int offsetCalc;
 string text;
 eletype resultType;
 vector<typeRecord*> typeRecordList;
@@ -72,7 +73,7 @@ PROG: PROG FUNC_DEF
 
 MAINFUNCTION: MAIN_HEAD LCB BODY RCB
     {
-        printFunction(activeFuncPtr);
+        // printFunction(activeFuncPtr);
         deleteVarList(activeFuncPtr, scope);
         activeFuncPtr=NULL;
         scope=0;
@@ -89,7 +90,8 @@ MAIN_HEAD: INT MAIN LP RP
         activeFuncPtr->returnType = INTEGER;
         activeFuncPtr->numOfParam = 0;
         activeFuncPtr->parameterList.clear();
-        activeFuncPtr->variableList.clear();        ;
+        activeFuncPtr->variableList.clear();  
+        activeFuncPtr->functionOffset = 0;      ;
         typeRecordList.clear();
         searchFunc(activeFuncPtr, funcEntryRecord, found);
         if (found) {
@@ -100,7 +102,7 @@ MAIN_HEAD: INT MAIN LP RP
         else {
             addFunction(activeFuncPtr, funcEntryRecord);
             scope = 2; 
-            string s = "function begin main";
+            string s = "function begin _main";
             gen(functionInstruction, s, nextquad);
         }
     }
@@ -108,7 +110,7 @@ MAIN_HEAD: INT MAIN LP RP
 
 FUNC_DEF: FUNC_HEAD LCB BODY RCB
     {
-        printFunction(activeFuncPtr);
+        // printFunction(activeFuncPtr);
         deleteVarList(activeFuncPtr, scope);
         activeFuncPtr=NULL;
         scope=0;
@@ -121,6 +123,7 @@ FUNC_HEAD: RES_ID LP DECL_PLIST RP
     {
         activeFuncPtr->numOfParam = typeRecordList.size();
         activeFuncPtr->parameterList = typeRecordList;
+        activeFuncPtr->functionOffset = 0;
         typeRecordList.clear();
         searchFunc(activeFuncPtr, funcEntryRecord, found);
         if(found){
@@ -131,7 +134,7 @@ FUNC_HEAD: RES_ID LP DECL_PLIST RP
         else{
             addFunction(activeFuncPtr, funcEntryRecord);
             scope = 2; 
-            string s = "function begin " + activeFuncPtr->name + ": ";
+            string s = "function begin _" + activeFuncPtr->name;
             gen(functionInstruction, s, nextquad);
         }
     }
@@ -296,11 +299,11 @@ STMT: VAR_DECL{
             else {
                 string s;
                 if ($2.type != NULLVOID) {
-                    s = "return " + (*($2.registerName)) + ";";
+                    s = "return " + (*($2.registerName));
                     tempSet.freeRegister(*($2.registerName));
                 }
                 else {
-                    s = "return;";
+                    s = "return";
                 }
                 gen(functionInstruction, s, nextquad);
             }
@@ -333,9 +336,28 @@ DEC_ID_ARR: ID
         int found = 0;
         typeRecord* vn = NULL;
         // cout << "Scope : "<<scope<<endl;
-        searchVariable(string($1), activeFuncPtr, found, vn);
-        if (found && vn->scope == scope) {
-            printf("Variable %s already declared at same level %d\n", $1, scope);
+        searchVariable(string($1), activeFuncPtr, found, vn, scope);
+        if (found) {
+            if(vn->isValid==true){
+                printf("Variable %s already declared at same level %d\n", $1, scope);
+            }
+            else{
+                if(vn->eleType == resultType){
+                    vn->isValid=true;
+                    vn->maxDimlistOffset = max(vn->maxDimlistOffset,1);
+                    vn->type=SIMPLE;
+                }
+                else {
+                    varRecord = new typeRecord;
+                    varRecord->name = string($1);
+                    varRecord->type = SIMPLE;
+                    varRecord->tag = VARIABLE;
+                    varRecord->scope = scope;
+                    varRecord->isValid=true;
+                    varRecord->maxDimlistOffset=1;
+                    typeRecordList.push_back(varRecord);
+                }
+            }
         }
         else if (scope == 2) {
             typeRecord* pn = NULL;
@@ -350,6 +372,8 @@ DEC_ID_ARR: ID
                 varRecord->type = SIMPLE;
                 varRecord->tag = VARIABLE;
                 varRecord->scope = scope;
+                varRecord->isValid=true;
+                varRecord->maxDimlistOffset=1;
                 // cout<<"variable name: "<<varRecord->name<<endl;
                 typeRecordList.push_back(varRecord);
             }
@@ -360,6 +384,8 @@ DEC_ID_ARR: ID
             varRecord->type = SIMPLE;
             varRecord->tag = VARIABLE;
             varRecord->scope = scope;
+            varRecord->isValid=true;
+            varRecord->maxDimlistOffset=1;
             // cout<<"variable name: "<<varRecord->name<<endl;
             typeRecordList.push_back(varRecord);
         }
@@ -369,9 +395,28 @@ DEC_ID_ARR: ID
         int found = 0;
         typeRecord* vn = NULL;
         // cout << "Scope : "<<scope<<endl;
-        searchVariable(string($1), activeFuncPtr, found, vn);
-        if (found && vn->scope == scope) {
-            printf("Variable %s already declared at same level %d\n", $1, scope);
+        searchVariable(string($1), activeFuncPtr, found, vn, scope);
+        if (found) {
+            if(vn->isValid==true){
+                printf("Variable %s already declared at same level %d\n", $1, scope);
+            }
+            else{
+                if(vn->eleType == resultType){
+                    vn->isValid=true;
+                    vn->maxDimlistOffset = max(vn->maxDimlistOffset,1);
+                    vn->type=SIMPLE;
+                }
+                else {
+                    varRecord = new typeRecord;
+                    varRecord->name = string($1);
+                    varRecord->type = SIMPLE;
+                    varRecord->tag = VARIABLE;
+                    varRecord->scope = scope;
+                    varRecord->isValid=true;
+                    varRecord->maxDimlistOffset=1;
+                    typeRecordList.push_back(varRecord);
+                }
+            }
         }
         else if (scope == 2) {
             typeRecord* pn = NULL;
@@ -386,6 +431,8 @@ DEC_ID_ARR: ID
                 varRecord->type = SIMPLE;
                 varRecord->tag = VARIABLE;
                 varRecord->scope = scope;
+                varRecord->maxDimlistOffset=1;
+                varRecord->isValid=true;
                 // cout<<"variable name: "<<varRecord->name<<endl;
                 typeRecordList.push_back(varRecord);
             }
@@ -396,6 +443,8 @@ DEC_ID_ARR: ID
             varRecord->type = SIMPLE;
             varRecord->tag = VARIABLE;
             varRecord->scope = scope;
+            varRecord->maxDimlistOffset=1;
+            varRecord->isValid=true;
             // cout<<"variable name: "<<varRecord->name<<endl;
             typeRecordList.push_back(varRecord);
         }
@@ -404,9 +453,42 @@ DEC_ID_ARR: ID
     {  
         int found = 0;
         typeRecord* vn = NULL;
-        searchVariable(string($1), activeFuncPtr, found, vn); 
-        if (found && vn->scope == scope) {
-            printf("Variable %s already declared at same level %d\n", $1, scope);
+        searchVariable(string($1), activeFuncPtr, found, vn,scope); 
+        if (found) {
+            if(vn->isValid==true){
+                printf("Variable %s already declared at same level %d\n", $1, scope);
+            }
+            else{
+                if(vn->eleType == resultType){
+                    vn->isValid=true;
+                    int a=1;
+                    for(auto it : dimlist){
+                        a*=(it);
+                    }
+                    vn->maxDimlistOffset = max(vn->maxDimlistOffset,a);
+                    if(vn->type==ARRAY){
+                        vn->dimlist.clear();           
+                    }
+                    vn->type=ARRAY;
+                    vn->dimlist = dimlist;
+                }
+                else {
+                    varRecord = new typeRecord;
+                    varRecord->name = string($1);
+                    varRecord->type = ARRAY;
+                    varRecord->tag = VARIABLE;
+                    varRecord->scope = scope;
+                    varRecord->dimlist = dimlist;
+                    varRecord->isValid=true;
+                    int a=1;
+                    for(auto it : dimlist){
+                        a*=(it);
+                    }
+                    varRecord->maxDimlistOffset = a;
+                    // cout<<"variable name: "<<varRecord->name<<endl;
+                    typeRecordList.push_back(varRecord);
+                }
+            }
         }
         else if (scope == 2) {
             typeRecord* pn = NULL;
@@ -421,6 +503,12 @@ DEC_ID_ARR: ID
                 varRecord->tag = VARIABLE;
                 varRecord->scope = scope;
                 varRecord->dimlist = dimlist;
+                varRecord->isValid=true;
+                int a=1;
+                for(auto it : dimlist){
+                    a*=(it);
+                }
+                varRecord->maxDimlistOffset = a;
                 // cout<<"variable name: "<<varRecord->name<<endl;
                 typeRecordList.push_back(varRecord);
             }
@@ -432,6 +520,12 @@ DEC_ID_ARR: ID
             varRecord->tag = VARIABLE;
             varRecord->scope = scope;
             varRecord->dimlist = dimlist;
+            varRecord->isValid=true;
+            int a=1;
+            for(auto it : dimlist){
+                a*=(it);
+            }
+            varRecord->maxDimlistOffset = a;
             typeRecordList.push_back(varRecord);
         }
         dimlist.clear();  
@@ -467,8 +561,9 @@ FUNC_CALL: ID LP PARAMLIST RP
         }
         else {
             $$.type = callFuncPtr->returnType;
+            // reverse(typeRecordList.begin(),typeRecordList.end());
             for(auto it : typeRecordList){
-                gen(functionInstruction, "param " + it->name + ";", nextquad);   
+                gen(functionInstruction, "param " + it->name , nextquad);   
                 tempSet.freeRegister(it->name);
             }
             int isRefParam = 0;
@@ -480,9 +575,10 @@ FUNC_CALL: ID LP PARAMLIST RP
                 $$.registerName = new string(tempSet.getFloatRegister());
                 isRefParam++;
             }
-            gen(functionInstruction, "refparam " + (*($$.registerName)) + ";", nextquad);
-            gen(functionInstruction, "call " + callFuncPtr->name + ", " + to_string(typeRecordList.size() + isRefParam )+ "; ", nextquad);            
+            gen(functionInstruction, "refparam " + (*($$.registerName)), nextquad);
+            gen(functionInstruction, "call " + callFuncPtr->name + ", " + to_string(typeRecordList.size() + isRefParam ), nextquad);            
         }
+        cout<<"t1 "<<endl;
         typeRecordList.clear();
     }
 ;
@@ -536,20 +632,20 @@ ASG: CONDITION1
             string registerName;
             if ($1.type == INTEGER && $3.type == FLOATING) {
                 registerName = tempSet.getRegister();
-                string s = registerName + " = convertToInt(" + (*($3.registerName)) + ");";   
+                string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
                 gen(functionInstruction, s, nextquad);
                 tempSet.freeRegister(*($3.registerName));
             }
             else if($1.type == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
                 registerName = tempSet.getFloatRegister();
-                string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ");";   
+                string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
                 gen(functionInstruction, s, nextquad); 
                 tempSet.freeRegister(*($3.registerName));
             }
             else {
                 registerName = *($3.registerName);
             }
-            string s = (*($1.registerName)) + " = " + registerName + ";";
+            string s = (*($1.registerName)) + " = " + registerName ;
             gen(functionInstruction, s, nextquad);
             $$.registerName = new string(registerName);
         }
@@ -787,7 +883,7 @@ CONDITION1: CONDITION2 OR CONDITION1
         else{
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());
-            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " || " + (*($3.registerName)) + ";";   
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " || " + (*($3.registerName)) ;   
             gen(functionInstruction, s, nextquad);
             tempSet.freeRegister(*($1.registerName));
             tempSet.freeRegister(*($3.registerName)); 
@@ -810,7 +906,7 @@ CONDITION2: EXPR1 AND CONDITION2
         else{
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());
-            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " && " + (*($3.registerName)) + ";";   
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " && " + (*($3.registerName)) ;   
             gen(functionInstruction, s, nextquad);
             tempSet.freeRegister(*($1.registerName));
             tempSet.freeRegister(*($3.registerName));   
@@ -830,7 +926,7 @@ EXPR1: NOT EXPR21
         $$.type = $2.type;
         if ($$.type != ERRORTYPE) {
             $$.registerName = $2.registerName;
-            string s = (*($$.registerName)) + " = ~" + (*($2.registerName))+";";   
+            string s = (*($$.registerName)) + " = ~" + (*($2.registerName));   
             gen(functionInstruction, s, nextquad);
         }
     }
@@ -851,7 +947,7 @@ EXPR21: EXPR2 EQUAL EXPR2
         else {
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());     
-            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " == " + (*($3.registerName))+ ";";   
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " == " + (*($3.registerName))   ;
             gen(functionInstruction, s, nextquad);
             tempSet.freeRegister(*($1.registerName));
             tempSet.freeRegister(*($3.registerName));  
@@ -865,7 +961,7 @@ EXPR21: EXPR2 EQUAL EXPR2
         else{
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());     
-            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " != " + (*($3.registerName))+ ";";   
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " != " + (*($3.registerName));   
             gen(functionInstruction, s, nextquad);
             tempSet.freeRegister(*($1.registerName));
             tempSet.freeRegister(*($3.registerName));  
@@ -879,7 +975,7 @@ EXPR21: EXPR2 EQUAL EXPR2
         else{
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());     
-            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " < " + (*($3.registerName))+ ";";   
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " < " + (*($3.registerName));   
             gen(functionInstruction, s, nextquad);
             tempSet.freeRegister(*($1.registerName));
             tempSet.freeRegister(*($3.registerName));  
@@ -893,7 +989,7 @@ EXPR21: EXPR2 EQUAL EXPR2
         else{
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());     
-            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " > " + (*($3.registerName))+ ";";   
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " > " + (*($3.registerName));   
             gen(functionInstruction, s, nextquad);
             tempSet.freeRegister(*($1.registerName));
             tempSet.freeRegister(*($3.registerName));  
@@ -903,11 +999,12 @@ EXPR21: EXPR2 EQUAL EXPR2
     {
         if($1.type == ERRORTYPE || $3.type == ERRORTYPE){
             $$.type = ERRORTYPE;
+            errorFound = true;
         }
         else{
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());     
-            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " <= " + (*($3.registerName))+ ";";   
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " <= " + (*($3.registerName));   
             gen(functionInstruction, s, nextquad);
             tempSet.freeRegister(*($1.registerName));
             tempSet.freeRegister(*($3.registerName));  
@@ -921,7 +1018,7 @@ EXPR21: EXPR2 EQUAL EXPR2
         else{
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());     
-            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " >= " + (*($3.registerName))+ ";";  
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " >= " + (*($3.registerName));  
             gen(functionInstruction, s, nextquad);
             tempSet.freeRegister(*($1.registerName));
             tempSet.freeRegister(*($3.registerName));  
@@ -930,8 +1027,13 @@ EXPR21: EXPR2 EQUAL EXPR2
     | EXPR2 
     {
         $$.type = $1.type; 
-        $$.registerName = new string(*($1.registerName)); 
-        delete $1.registerName;     
+        if($$.type == ERRORTYPE){
+            errorFound = true;
+        }
+        else{
+            $$.registerName = new string(*($1.registerName)); 
+            delete $1.registerName; 
+        }    
     }
 ;
 
@@ -947,14 +1049,14 @@ EXPR2:  EXPR2 PLUS TERM
 
                 if ($1.type == INTEGER && $3.type == FLOATING) {
                     string newReg = tempSet.getFloatRegister();
-                    string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ");";
+                    string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ")";
                     tempSet.freeRegister(*($1.registerName));
                     $1.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
                 }
                 else if ($1.type == FLOATING && $3.type == INTEGER) {
                     string newReg = tempSet.getFloatRegister();
-                    string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ");";
+                    string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ")";
                     tempSet.freeRegister(*($3.registerName));
                     $3.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
@@ -965,7 +1067,7 @@ EXPR2:  EXPR2 PLUS TERM
                 else
                     $$.registerName = new string(tempSet.getFloatRegister());
                     
-                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " + " + (*($3.registerName))+ ";";;   
+                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " + " + (*($3.registerName));;   
                 gen(functionInstruction, s, nextquad);
                 tempSet.freeRegister(*($1.registerName));
                 tempSet.freeRegister(*($3.registerName));   
@@ -988,14 +1090,14 @@ EXPR2:  EXPR2 PLUS TERM
 
                 if ($1.type == INTEGER && $3.type == FLOATING) {
                     string newReg = tempSet.getFloatRegister();
-                    string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ");";
+                    string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ")";
                     tempSet.freeRegister(*($1.registerName));
                     $1.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
                 }
                 else if ($1.type == FLOATING && $3.type == INTEGER) {
                     string newReg = tempSet.getFloatRegister();
-                    string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ");";
+                    string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ")";
                     tempSet.freeRegister(*($3.registerName));
                     $3.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
@@ -1006,7 +1108,7 @@ EXPR2:  EXPR2 PLUS TERM
                 else
                     $$.registerName = new string(tempSet.getFloatRegister());
                     
-                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " - " + (*($3.registerName))+ ";";;   
+                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " - " + (*($3.registerName));;   
                 gen(functionInstruction, s, nextquad);
                 tempSet.freeRegister(*($1.registerName));
                 tempSet.freeRegister(*($3.registerName));   
@@ -1041,14 +1143,14 @@ TERM: TERM MUL FACTOR
 
                 if ($1.type == INTEGER && $3.type == FLOATING) {
                     string newReg = tempSet.getFloatRegister();
-                    string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ");";
+                    string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ")";
                     tempSet.freeRegister(*($1.registerName));
                     $1.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
                 }
                 else if ($1.type == FLOATING && $3.type == INTEGER) {
                     string newReg = tempSet.getFloatRegister();
-                    string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ");";
+                    string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ")";
                     tempSet.freeRegister(*($3.registerName));
                     $3.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
@@ -1059,7 +1161,7 @@ TERM: TERM MUL FACTOR
                 else
                     $$.registerName = new string(tempSet.getFloatRegister());
                     
-                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " * " + (*($3.registerName))+ ";";;   
+                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " * " + (*($3.registerName));;   
                 gen(functionInstruction, s, nextquad);
                 tempSet.freeRegister(*($1.registerName));
                 tempSet.freeRegister(*($3.registerName));   
@@ -1081,14 +1183,14 @@ TERM: TERM MUL FACTOR
 
                 if ($1.type == INTEGER && $3.type == FLOATING) {
                     string newReg = tempSet.getFloatRegister();
-                    string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ");";
+                    string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ")";
                     tempSet.freeRegister(*($1.registerName));
                     $1.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
                 }
                 else if ($1.type == FLOATING && $3.type == INTEGER) {
                     string newReg = tempSet.getFloatRegister();
-                    string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ");";
+                    string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ")";
                     tempSet.freeRegister(*($3.registerName));
                     $3.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
@@ -1099,7 +1201,7 @@ TERM: TERM MUL FACTOR
                 else
                     $$.registerName = new string(tempSet.getFloatRegister());
                     
-                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " / " + (*($3.registerName))+ ";";;   
+                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " / " + (*($3.registerName));   
                 gen(functionInstruction, s, nextquad);
                 tempSet.freeRegister(*($1.registerName));
                 tempSet.freeRegister(*($3.registerName));   
@@ -1119,7 +1221,7 @@ TERM: TERM MUL FACTOR
             if ($1.type == INTEGER && $3.type == INTEGER) {
                 $$.type = INTEGER;
                 $$.registerName = new string(tempSet.getRegister());  
-                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " % " + (*($3.registerName))+ ";";;   
+                string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " % " + (*($3.registerName));;   
                 gen(functionInstruction, s, nextquad);
                 tempSet.freeRegister(*($1.registerName));
                 tempSet.freeRegister(*($3.registerName));   
@@ -1149,24 +1251,24 @@ FACTOR: ID_ARR
         if ($$.type == INTEGER)
             $$.registerName = new string(tempSet.getRegister());
         else $$.registerName = new string(tempSet.getFloatRegister());
-        string s = (*($$.registerName)) + " = " + (*($1.registerName)) + ";";
+        string s = (*($$.registerName)) + " = " + (*($1.registerName)) ;
         gen(functionInstruction, s, nextquad);
     }
     | NUMINT    
     { 
         $$.type = INTEGER; 
         $$.registerName = new string(tempSet.getRegister());
-        string s = (*($$.registerName)) + " = " + string($1) + ";";
+        string s = (*($$.registerName)) + " = " + string($1) ;
         gen(functionInstruction, s, nextquad);  
     }
     | NUMFLOAT  
     { 
         $$.type = FLOATING;
         $$.registerName = new string(tempSet.getFloatRegister());
-        string s = (*($$.registerName)) + " = " + string($1) + ";";
+        string s = (*($$.registerName)) + " = " + string($1) ;
         gen(functionInstruction, s, nextquad);  
     }
-    | FUNC_CALL 
+    |  FUNC_CALL 
     { 
         // TODO
         $$.type = $1.type; 
@@ -1187,11 +1289,15 @@ FACTOR: ID_ARR
         if ($1.type == INTEGER) {
             $$.type = INTEGER;   
             string newReg = tempSet.getRegister();
-            $$.registerName = new string(newReg);
-            string s = newReg + " = " + (*($1.registerName)) + ";";
+            $$.registerName = new string(newReg); 
+            string s = newReg + " = " + (*($1.registerName)) ;
+            gen(functionInstruction, s, nextquad); // T2 = i
+            string newReg2 = tempSet.getRegister();
+            s = newReg2 + " = " + newReg + " + 1"; // T3 = T2+1
             gen(functionInstruction, s, nextquad);
-            s = (*($1.registerName)) + " = " + newReg + " + 1;";
+            s = (*($1.registerName)) + " = " + newReg2; // i = T3
             gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(newReg2);
         }
         else {
             $$.type = ERRORTYPE;
@@ -1204,10 +1310,14 @@ FACTOR: ID_ARR
             $$.type = INTEGER;   
             string newReg = tempSet.getRegister();
             $$.registerName = new string(newReg);
-            string s = newReg + " = " + (*($1.registerName)) + ";";
+            string s = newReg + " = " + (*($1.registerName)) ;
             gen(functionInstruction, s, nextquad);
-            s = (*($1.registerName)) + " = " + newReg + " - 1;";
-            gen(functionInstruction, s, nextquad);     
+            string newReg2 = tempSet.getRegister();
+            s = newReg2 + " = " + newReg + " - 1"; // T3 = T2+1
+            gen(functionInstruction, s, nextquad);
+            s = (*($1.registerName)) + " = " + newReg2; // i = T3
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(newReg2);     
         }
         else {
             $$.type = ERRORTYPE;
@@ -1220,9 +1330,9 @@ FACTOR: ID_ARR
             $$.type = INTEGER;   
             string newReg = tempSet.getRegister();
             $$.registerName = new string(newReg);
-            string s = newReg + " = " + (*($2.registerName)) + " + 1;";
+            string s = newReg + " = " + (*($2.registerName)) + " + 1";
             gen(functionInstruction, s, nextquad);
-            s = (*($2.registerName)) + " = " + newReg + ";";
+            s = (*($2.registerName)) + " = " + newReg ;
             gen(functionInstruction, s, nextquad);      
         }
         else {
@@ -1236,9 +1346,9 @@ FACTOR: ID_ARR
             $$.type = INTEGER;   
             string newReg = tempSet.getRegister();
             $$.registerName = new string(newReg);
-            string s = newReg + " = " + (*($2.registerName)) + " - 1;";
+            string s = newReg + " = " + (*($2.registerName)) + " - 1";
             gen(functionInstruction, s, nextquad);
-            s = (*($2.registerName)) + " = " + newReg + ";";
+            s = (*($2.registerName)) + " = " + newReg ;
             gen(functionInstruction, s, nextquad);        
         }
         else {
@@ -1253,11 +1363,13 @@ ID_ARR: ID
         // retrieve the highest level id with same name in param list or var list
         int found = 0;
         typeRecord* vn = NULL;
-        searchVariable(string($1), activeFuncPtr, found, vn); 
+        searchCallVariable(string($1), activeFuncPtr, found, vn); 
         if(found){
             if (vn->type == SIMPLE) {
                 $$.type = vn->eleType;
-                $$.registerName = new string(string($1));
+                string dataType = eletypeMapper($$.type);
+                dataType += "_" + to_string(vn->scope);
+                $$.registerName = new string("_" + string($1) + "_" + dataType);
             }
             else {
                 $$.type = ERRORTYPE;
@@ -1269,7 +1381,9 @@ ID_ARR: ID
             if (found) {
                 if (vn->type == SIMPLE) {
                     $$.type = vn->eleType;
-                    $$.registerName = new string(string($1));
+                    string dataType = eletypeMapper($$.type);
+                    dataType += "_" + to_string(vn->scope);
+                    $$.registerName = new string("_" + string($1) + "_" + dataType);
                 }
                 else {
                     $$.type = ERRORTYPE;
@@ -1287,7 +1401,7 @@ ID_ARR: ID
         // retrieve the highest level id with same name in param list or var list
         int found = 0;
         typeRecord* vn = NULL;
-        searchVariable(string($1), activeFuncPtr, found, vn); 
+        searchCallVariable(string($1), activeFuncPtr, found, vn); 
         if(found){
             if (vn->type == ARRAY) {
                 if (dimlist.size() == vn->dimlist.size()) {
@@ -1299,7 +1413,10 @@ ID_ARR: ID
                         if (i != vn->dimlist.size()-1) offset *= vn->dimlist[i+1];  
                     }
                     string os = to_string(offset);
-                    string s = string($1) + "[" + os + "]";
+                    string dataType = eletypeMapper($$.type);
+                    dataType += "_" + to_string(vn->scope);
+                    string s = "_" + string($1) + "_" + dataType;
+                    // string s = string($1) + "[" + os + "]";
                     $$.registerName = new string(s); 
                 }
                 else {
@@ -1329,7 +1446,10 @@ ID_ARR: ID
                             if (i != vn->dimlist.size()-1) offset *= vn->dimlist[i+1];  
                         }
                         string os = to_string(offset);
-                        string s = string($1) + "[" + os + "]";
+                        string dataType = eletypeMapper($$.type);
+                        dataType += "_" + to_string(vn->scope);
+                        string s = "_" + string($1) + "_" + dataType;
+                        // string s = string($1) + "[" + os + "]";
                         $$.registerName = new string(s); 
                     }
                     else {
@@ -1365,23 +1485,17 @@ int main(int argc, char **argv)
     nextquad = 0;
     scope = 0;
     found = 0;
+    offsetCalc = 0;
     errorFound=false;
     
     if( remove( "tempInter.txt" ) != 0 )
     {
-        cout<<"Error deleting file";
-    }
-    else{
-        cout<<"File successfully deleted";
     }
     yyparse();
     if( remove( "./output/intermediate.txt" ) != 0 )
     {
-        cout<<"Error deleting file";
     }
-    else{
-        cout<<"File successfully deleted";
-    }
+    populateOffsets(funcEntryRecord);
     ofstream outinter;
     outinter.open("./output/intermediate.txt");
     if(!errorFound){

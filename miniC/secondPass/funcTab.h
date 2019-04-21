@@ -37,6 +37,8 @@ struct typeRecord {
     Tag tag;
     int scope;
     vector<int> dimlist; // cube[x][y][z] => (x -> y -> z)
+    int varOffset;
+    bool isValid;
 
 }; 
 
@@ -44,6 +46,7 @@ struct funcEntry {
     string name;
     eletype returnType;
     int numOfParam;
+    int functionOffset;
     vector <typeRecord*> variableList;
     vector <typeRecord*> parameterList;
 }; 

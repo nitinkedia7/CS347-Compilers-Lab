@@ -13,7 +13,7 @@ public:
             tempRegister.push_back(i);
         }
         floatRegister.clear();
-        for(int i=31; i>=0; i--){
+        for(int i=30; i>=0; i--){
             floatRegister.push_back(i);
         }
     }
