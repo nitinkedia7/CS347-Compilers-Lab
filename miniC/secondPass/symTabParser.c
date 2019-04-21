@@ -7,6 +7,7 @@ string eletypeMapper(eletype a){
         case NULLVOID  : return "void";
         case BOOLEAN   : return "bool";
         case ERRORTYPE : return "error";
+        default: return "default";
     }
 }
 
@@ -20,8 +21,16 @@ int eletypeIntMapper(eletype a){
         default : return 999;
     }
 }
-
-int getOffset(string functionName, string variableName, int internalOffset){
+eletype getEleType(string x){
+    if(x=="0")
+        return INTEGER;
+    if(x=="1")
+        return FLOATING;
+    if(x=="2")
+        return NULLVOID;
+    return ERRORTYPE;
+}
+int getOffset(vector<funcEntry> &functionList,string functionName, string variableName, int internalOffset){
     for(auto it : functionList){
         if(it.name == functionName){
             for (auto it2 : it.variableList){
@@ -42,8 +51,17 @@ int getOffset(string functionName, string variableName, int internalOffset){
     return -1;
 }
 
-void printVector(vector<funcEntry> &functionList){
-    for(auto funcRecord : functionList){
+int getFunctionOffset(vector<funcEntry> &functionList,string functionName){
+    for(auto it : functionList){
+        if(it.name == functionName){
+            return it.functionOffset;
+        }
+    }
+    return -1;
+}
+
+void printVector(vector<funcEntry> &functionprintList){
+    for(auto funcRecord : functionprintList){
         cout << "$$" << endl;
         cout << "_" << funcRecord.name << " " << eletypeMapper(funcRecord.returnType) << " ";
         cout << funcRecord.numOfParam << " " << funcRecord.functionOffset << endl;
@@ -60,9 +78,9 @@ void printVector(vector<funcEntry> &functionList){
     }
 }
 
-void readSymbolTable(){
+void readSymbolTable(vector<funcEntry> &functionList){
     ifstream myfile;
-    myfile.open ("symtab.txt");
+    myfile.open ("../firstPass/symtab.txt");
     string a;
     while(myfile >> a){
         if(a=="$$"){

@@ -22,7 +22,10 @@ struct funcEntry {
 }; 
 
 string eletypeMapper(eletype a);
-void readSymbolTable();
 int eletypeIntMapper(eletype a);
-int getOffset(string functionName, string variableName, int internalOffset);
+eletype getEleType(string x);
+
+void readSymbolTable(vector<funcEntry> &functionList);
+int getOffset(vector<funcEntry> &functionList, string functionName, string variableName, int internalOffset);
+int getFunctionOffset(vector<funcEntry> &functionList, string functionName);
 void printVector(vector<funcEntry> &functionList);

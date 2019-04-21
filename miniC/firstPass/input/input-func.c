@@ -8,9 +8,12 @@ int gcd(int a, int b){
 
 int main() {
     int a, b;
-    a = 45;
+    a = -45;
     b = 90;
     int c;
-    c = gcd(a, b);
+    c = -a;
+    c=b-a;
+    c=b+a;
+    c = gcd(-a, b);
     return 1; 
 }

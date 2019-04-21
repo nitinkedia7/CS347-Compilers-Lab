@@ -5,4 +5,4 @@ Pipfile
 reference/
 CS347-Assignment-3/oreilly/
 **/input/test.c
-**/output/*
+./miniC/firstPass/switchworkwithbreak.y

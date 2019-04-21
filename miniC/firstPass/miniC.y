@@ -30,6 +30,10 @@ int scope;
 int found;
 bool errorFound;
 int numberOfParameters;
+string conditionVar;
+vector<string> switchVar;
+
+vector<pair<string,int>> sVar;
 %} 
 
 %code requires{
@@ -58,9 +62,9 @@ int numberOfParameters;
 %type <idName> NUMINT
 %type <idName> ID
 %type <expr> EXPR2 TERM FACTOR ID_ARR ASG ASG1 EXPR1 EXPR21 CONDITION1 CONDITION2 LHS FUNC_CALL
-%type <whileexpval> WHILEEXP IFEXP N3 P3 Q3 FOREXP
-%type <stmtval> BODY WHILESTMT IFSTMT M2 FORLOOP STMT STMT_LIST
-%type <quad> M1 M3 Q4
+%type <whileexpval> WHILEEXP IFEXP N3 P3 Q3 FOREXP TEMP1
+%type <stmtval> BODY WHILESTMT IFSTMT M2 FORLOOP STMT STMT_LIST CASELIST
+%type <quad> M1 M3 Q4 
 %%
 
 MAIN_PROG: PROG MAINFUNCTION
@@ -102,7 +106,7 @@ MAIN_HEAD: INT MAIN LP RP
         else {
             addFunction(activeFuncPtr, funcEntryRecord);
             scope = 2; 
-            string s = "function begin _main";
+            string s = "function begin main";
             gen(functionInstruction, s, nextquad);
         }
     }
@@ -576,7 +580,7 @@ FUNC_CALL: ID LP PARAMLIST RP
                 isRefParam++;
             }
             gen(functionInstruction, "refparam " + (*($$.registerName)), nextquad);
-            gen(functionInstruction, "call " + callFuncPtr->name + ", " + to_string(typeRecordList.size() + isRefParam ), nextquad);            
+            gen(functionInstruction, "call _" + callFuncPtr->name + ", " + to_string(typeRecordList.size() + isRefParam ), nextquad);            
         }
         cout<<"t1 "<<endl;
         typeRecordList.clear();
@@ -666,16 +670,87 @@ LHS: ID_ARR
     } 
 ;
 
-SWITCHCASE: SWITCH LP ASG RP {scope++;} LCB CASELIST RCB 
+SWITCHCASE: SWITCH LP ASG RP TEMP1 LCB  CASELIST RCB 
     {
         deleteVarList(activeFuncPtr,scope);
         scope--;
+
+        int q=nextquad;
+        vector<int>* qList = new vector<int>;
+        qList->push_back(q);
+        gen(functionInstruction, "goto L", nextquad);
+        backpatch($5.falseList, nextquad, functionInstruction);
+        gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+        for(auto it : sVar){
+            if(it.first == "default"){
+                gen(functionInstruction, "goto L"+to_string(it.second), nextquad);
+                break;
+            }
+            gen(functionInstruction, "if "+ (*($3.registerName)) +" == "+ it.first + " goto L" + to_string(it.second), nextquad);
+            // tempSet.freeRegister(it.first);            
+        }
+        sVar.clear();
+        backpatch(qList, nextquad, functionInstruction);
+        backpatch($7.breakList, nextquad, functionInstruction);
+        gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+        
+        // switchVar.pop_back();
+        // tempSet.freeRegister(*($3.registerName));
+        
+        // gen(functionInstruction, "L" + to_string(nextquad)+":", nextquad);
     }
 ;
 
-CASELIST:   CASE CONDITION1 COLON BODY CASELIST
-    | CASE CONDITION1 COLON BODY
-    | DEFAULT COLON BODY
+TEMP1: %empty
+    {
+        // string varName = switchVar[switchVar.size()-1]; 
+        $$.begin=nextquad;
+        $$.falseList = new vector<int>;
+        $$.falseList->push_back(nextquad);
+        gen(functionInstruction, "goto L", nextquad);
+        // gen(functionInstruction, "if "+ varName +" != "+ conditionVar + " goto L", nextquad);   
+        // tempSet.freeRegister(conditionVar);
+        scope++;
+
+    }
+;
+
+CASELIST:   
+    CASE NUMINT {
+        sVar.push_back(make_pair(string($2), nextquad));
+        gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+        } COLON BODY 
+    CASELIST
+    {
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+        merge($$.continueList,$5.continueList);
+        merge($$.breakList, $5.breakList);
+        merge($$.nextList, $5.nextList);
+        merge($$.continueList,$6.continueList);
+        merge($$.breakList, $6.breakList);
+        merge($$.nextList, $6.nextList);
+    }
+    | %empty
+    {
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+    }
+    | DEFAULT COLON {
+        sVar.push_back(make_pair("default", nextquad));
+        gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+    }
+     BODY {
+        // gen(functionInstruction, "L" + to_string(nextquad)+":", nextquad);
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+        merge($$.continueList,$4.continueList);
+        merge($$.breakList, $4.breakList);
+        merge($$.nextList, $4.nextList);
+    }
 ;
 
 M3: %empty { 
@@ -1254,12 +1329,35 @@ FACTOR: ID_ARR
         string s = (*($$.registerName)) + " = " + (*($1.registerName)) ;
         gen(functionInstruction, s, nextquad);
     }
+    |MINUS ID_ARR
+    {
+        $$.type = $2.type;
+        if ($$.type == INTEGER)
+            $$.registerName = new string(tempSet.getRegister());
+        else $$.registerName = new string(tempSet.getFloatRegister());
+        string s = (*($$.registerName)) + " = -" + (*($2.registerName)) ;
+        gen(functionInstruction, s, nextquad);
+    }
+    | MINUS NUMINT
+    {
+        $$.type = INTEGER; 
+        $$.registerName = new string(tempSet.getRegister());
+        string s = (*($$.registerName)) + " = -" + string($2) ;
+        gen(functionInstruction, s, nextquad);  
+    }
     | NUMINT    
     { 
         $$.type = INTEGER; 
         $$.registerName = new string(tempSet.getRegister());
         string s = (*($$.registerName)) + " = " + string($1) ;
         gen(functionInstruction, s, nextquad);  
+    }
+    | MINUS NUMFLOAT
+    {
+        $$.type = FLOATING;
+        $$.registerName = new string(tempSet.getFloatRegister());
+        string s = (*($$.registerName)) + " = " + string($2) ;
+        gen(functionInstruction, s, nextquad);     
     }
     | NUMFLOAT  
     { 
@@ -1487,7 +1585,7 @@ int main(int argc, char **argv)
     found = 0;
     offsetCalc = 0;
     errorFound=false;
-    
+    switchVar.clear();
     if( remove( "tempInter.txt" ) != 0 )
     {
     }

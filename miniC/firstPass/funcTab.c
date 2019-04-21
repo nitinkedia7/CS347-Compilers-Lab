@@ -198,6 +198,7 @@ string eletypeMapper(eletype a){
         case BOOLEAN   : return "bool";
         case ERRORTYPE : return "error";
     }
+    return "vvv";
 }
 
 int eletypeIntMapper(eletype a){
@@ -208,6 +209,7 @@ int eletypeIntMapper(eletype a){
         case BOOLEAN   : return 3;
         case ERRORTYPE : return 4;
     }
+    return 5;
 }
 
 int varTypeMapper(varType a){
@@ -215,6 +217,7 @@ int varTypeMapper(varType a){
         case SIMPLE : return 0;
         case ARRAY  : return 1;
     }
+    return 2;
 }
 
 int TagMapper(Tag a){
@@ -222,6 +225,7 @@ int TagMapper(Tag a){
         case PARAMAETER : return 0;
         case VARIABLE   : return 1;
     }
+    return 2;
 }
 
 void populateOffsets(vector<funcEntry*> &funcEntryRecord){
@@ -246,7 +250,7 @@ void populateOffsets(vector<funcEntry*> &funcEntryRecord){
 
 void printSymbolTable(vector<funcEntry*> &funcEntryRecord){
     ofstream symbolTable;
-    symbolTable.open("symtab.txt");
+    symbolTable.open("./output/symtab.txt");
     for(auto &funcRecord : funcEntryRecord){
         symbolTable << "$$" << endl;
         symbolTable << "_" << funcRecord->name << " " << eletypeMapper(funcRecord->returnType) << " ";
