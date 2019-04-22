@@ -1,5 +1,11 @@
 #pragma once
-#include <bits/stdc++.h>
+#include <iostream>
+#include <vector>
+#include <stack>
+#include <stdio.h>
+// #include <algorithm>
+#include <utility>
+#include <fstream>
 using namespace std;
 
 enum eletype {INTEGER, FLOATING, NULLVOID, BOOLEAN, ERRORTYPE};
@@ -9,6 +15,7 @@ enum Tag{PARAMAETER, VARIABLE};
 struct expression{
     eletype type;
     string* registerName;
+    string* offsetRegName;
 };
 
 struct stmt {
@@ -20,6 +27,27 @@ struct stmt {
 struct whileexp {
     int begin;
     vector<int> *falseList;
+};
+
+struct shortcircuit{
+    eletype type;
+    string* registerName;
+    vector<int>* jumpList;
+};
+
+struct condition2temp{
+    vector<int> *temp;
+};
+
+struct switchcaser{
+    vector<int> *nextList;
+    vector<pair<string,int>> *casepair;
+    vector<int> *breakList;
+    vector<int> *continueList;
+};
+
+struct switchtemp{
+    vector<pair<string,int>> *casepair;
 };
 
 struct typeRecord {

@@ -1,6 +1,10 @@
 %{
 #pragma GCC diagnostic ignored "-Wwrite-strings"
-#include <bits/stdc++.h>
+#include <iostream>
+#include <vector>
+#include <stack>
+#include <stdio.h>
+#include <fstream>
 #include "symTabParser.h"
 using namespace std;
 
@@ -33,7 +37,7 @@ void retrieveRegisters(int frameSize);
 
 %token FUNCTION BEG END IF GOTO PARAM REFPARAM CALL LSB RSB RETURN NEWLINE
 %token CONVERTINT CONVERTFLOAT LP RP
-%token USERVAR REGINT REGFLOAT LABEL NUMINT NUMFLOAT 
+%token USERVAR REGINT REGFLOAT LABEL NUMINT NUMFLOAT PRINT READ
 %token COMMA COLON SEMI
 %token PLUS MINUS MUL DIV MOD
 %token EQUAL NOTEQUAL OR AND LT GT LE GE ASSIGN NEG
@@ -62,13 +66,13 @@ STMT: ASG
         // The initial frame of the caller function remains intact, grows downwards for each param
         paramOffset += INTSIZE;
         fprintf(mips, "sub $sp, $sp, %d\n", INTSIZE); // addu $sp, $sp, -INTSIZE
-        fprintf(mips, "sw $t%c 0($sp)\n", $2[1]);     // sw $t0, 0($sp)
+        fprintf(mips, "sw $t%c, 0($sp)\n", $2[1]);     // sw $t0, 0($sp)
     }
     | PARAM REGFLOAT
     {
         paramOffset += FLOATSIZE;
         fprintf(mips, "sub $sp, $sp, %d\n", FLOATSIZE);    // addu $sp, $sp, -INTSIZE
-        fprintf(mips, "mfc1 $s0 $f%s\n", $2+1);             // store a float reg into int reg s0
+        fprintf(mips, "mfc1 $s0, $f%s\n", $2+1);             // store a float reg into int reg s0
         fprintf(mips, "sw $s0, 0($sp)\n");                 // sw $t0, 0($sp)
     }
     | REFPARAM REGINT 
@@ -88,14 +92,14 @@ STMT: ASG
         if(returnVal[0] == 'F'){
             fprintf(mips, "move $s0, $v0\n");   // move result to refparam
             fprintf(mips, "mtc1 $s0, $f%s\n", returnVal.c_str()+1);   // move result to refparam
-            fprintf(mips, "cvt.s.w $f%s, $f%s\n", returnVal.c_str()+1, returnVal.c_str()+1);
         } else {
             fprintf(mips, "move $t%c, $v0\n", returnVal[1]);   // move result to refparam 
         }
-        fprintf(mips, "add $sp, $sp, %d\n", paramOffset);  // collapse space used by parameters
-        paramOffset = 0;
+        int funcParamOffset = getParamOffset(functionList, string($2));
+        fprintf(mips, "add $sp, $sp, %d\n", funcParamOffset);  // collapse space used by parameters
+        paramOffset-=funcParamOffset;
     }
-    | FUNCTION BEG USERVAR
+    | FUNCTION BEG USERVAR 
     {
         activeFunc = string($3);
         fprintf(mips, "%s:\n", $3);
@@ -109,7 +113,7 @@ STMT: ASG
     | FUNCTION END
     {
         int frameSize = getFunctionOffset(functionList, activeFunc);
-        fprintf(mips, "end_%s:\n", activeFunc.c_str()+1);
+        fprintf(mips, "end_%s:\n", activeFunc.c_str());
         fprintf(mips, "move $sp, $fp\n");                          // move    $sp,$fp
         fprintf(mips, "lw $ra, %d($sp)\n", frameSize-INTSIZE);     // lw      $31,52($sp)
         fprintf(mips, "lw $fp, %d($sp)\n", frameSize-2*INTSIZE);   // lw      $fp,48($sp)
@@ -119,36 +123,89 @@ STMT: ASG
     }
     | RETURN 
     {
-        fprintf(mips, "j end_%s\n", activeFunc.c_str()+1);
+        fprintf(mips, "j end_%s\n", activeFunc.c_str());
     }
     | RETURN REGINT
     {
         fprintf(mips, "move $v0, $t%c\n", $2[1]);
-        fprintf(mips, "j end_%s\n", activeFunc.c_str()+1);
+        fprintf(mips, "j end_%s\n", activeFunc.c_str());
     }
     | RETURN REGFLOAT
     {
-        fprintf(mips, "mfc1 $s0, $f%s", activeFunc.c_str()+1);
+        fprintf(mips, "mfc1 $s0, $f%s\n", $2+1);
         fprintf(mips, "move $v0, $s0\n");
         fprintf(mips, "j end_%s\n", activeFunc.c_str());
+    }
+    | PRINT REGINT
+    {
+        fprintf(mips, "move $a0, $t%s\n", $2+1);
+        fprintf(mips, "li $v0 1\n");
+        fprintf(mips, "syscall\n");
+        fprintf(mips, "li $v0, 4\n");//         li $v0, 4 # system call code for printing string = 4
+        fprintf(mips, "la $a0, endline\n");// la $a0, out_string # load address of string to be printed into $a0
+        fprintf(mips, "syscall\n");// syscall
+    }
+    | PRINT REGFLOAT
+    {
+        fprintf(mips, "mov.s $f12, $f%s\n", $2+1);
+        fprintf(mips, "li $v0 2\n");
+        fprintf(mips, "syscall\n");
+        fprintf(mips, "li $v0, 4\n");//         li $v0, 4 # system call code for printing string = 4
+        fprintf(mips, "la $a0, endline\n");// la $a0, out_string # load address of string to be printed into $a0
+        fprintf(mips, "syscall\n");// syscall
+    }
+    | READ REGINT
+    {
+        fprintf(mips, "li $v0 5\n");
+        fprintf(mips, "syscall\n");
+        fprintf(mips, "move $t%s, $v0\n", $2+1);
+    }
+    | READ REGFLOAT
+    {
+        fprintf(mips, "li $v0 6\n");
+        fprintf(mips, "syscall\n");
+        fprintf(mips, "mov.s $f%s, $f0\n", $2+1);
     }
 ;
 
 
 ASG: USERVAR ASSIGN REGINT
     {
-        int offset = getOffset(functionList,activeFunc, string($1), 0);
+        int offset = getOffset(functionList,activeFunc, string($1), 0)+paramOffset;
         fprintf(mips, "sw $t%c, %d($sp)\n", $3[1], offset);
     }
     | USERVAR LSB NUMINT RSB ASSIGN REGINT
     {
-        int offset = getOffset(functionList,activeFunc, string($1), 0);
+        int offset = getOffset(functionList,activeFunc, string($1), 0)+paramOffset;
         fprintf(mips, "sw $t%c, %d($sp)\n", $3[1], offset);
+    }
+    | USERVAR LSB REGINT RSB ASSIGN REGINT
+    {
+        int offset = getOffset(functionList,activeFunc, string($1), 0)+paramOffset;
+        fprintf(mips, "mul $t%s, $t%s, %d\n", $3+1, $3+1, INTSIZE);
+        fprintf(mips,"li $s1, %d\n", offset);
+        fprintf(mips,"addu $s0, $sp, $s1\n");
+        fprintf(mips,"sub $s0, $s0, $t%s\n", $3+1);
+        fprintf(mips,"sw $t%s, 0($s0)\n", $6+1);
     }
     | REGINT ASSIGN USERVAR
     {
-        int offset = getOffset(functionList,activeFunc, string($3), 0);
+        int offset = getOffset(functionList,activeFunc, string($3), 0)+paramOffset;
         fprintf(mips, "lw $t%c, %d($sp)\n", $1[1], offset);
+    }
+    | REGINT ASSIGN USERVAR LSB REGINT RSB
+    {
+        int offset = getOffset(functionList,activeFunc, string($3), 0)+paramOffset;
+        fprintf(mips, "mul $t%s, $t%s, %d\n", $5+1, $5+1, INTSIZE);
+        fprintf(mips,"li $s1, %d\n", offset);
+        fprintf(mips,"addu $s0, $sp, $s1\n");
+        fprintf(mips,"sub $s0, $s0, $t%s\n", $5+1);
+        fprintf(mips,"lw $t%s, 0($s0)\n", $1+1);
+    }
+    | REGINT ASSIGN USERVAR LSB NUMINT RSB
+    {
+        int offset = getOffset(functionList,activeFunc, string($3), 0)+paramOffset;
+        fprintf(mips, "sw $t%c, %d($sp)\n", $1[1], offset);
     }
     | REGINT ASSIGN NUMINT
     {
@@ -161,7 +218,7 @@ ASG: USERVAR ASSIGN REGINT
     | REGINT ASSIGN CONVERTINT LP REGFLOAT RP
     {
         fprintf(mips, "cvt.w.s $f%s, $f%s\n", $5+1, $5+1);
-        fprintf(mips, "mfc1 $t%c, $f%s", $1[1], $5+1);
+        fprintf(mips, "mfc1 $t%c, $f%s\n", $1[1], $5+1);
     }
     | REGINT ASSIGN REGINT PLUS NUMINT
     {
@@ -206,7 +263,7 @@ ASG: USERVAR ASSIGN REGINT
         // hack, will not arise when short-circuit is done
         fprintf(mips, "sne $t%c, $t%c, 0\n", $3[1], $3[1]);
         fprintf(mips, "sne $t%c, $t%c, 0\n", $5[1], $5[1]);
-        fprintf(mips, "and $t%c, $t%c, $t%c", $1[1], $3[1], $5[1]);
+        fprintf(mips, "and $t%c, $t%c, $t%c\n", $1[1], $3[1], $5[1]);
     }
     | REGINT ASSIGN REGINT OR REGINT
     {
@@ -232,18 +289,27 @@ ASG: USERVAR ASSIGN REGINT
 
 FLOATASG: USERVAR ASSIGN REGFLOAT
     {
-        int offset = getOffset(functionList, activeFunc, string($1), 0);
+        int offset = getOffset(functionList, activeFunc, string($1), 0)+paramOffset;
         fprintf(mips, "s.s $f%s, %d($sp)\n", $3+1, offset);
     }
     | USERVAR LSB NUMINT RSB ASSIGN REGFLOAT
     {
-        int offset = getOffset(functionList, activeFunc, string($1), 0);
+        int offset = getOffset(functionList, activeFunc, string($1), 0)+paramOffset;
         fprintf(mips, "s.s $f%s, %d($sp)\n", $3+1, offset);
+    }
+    | USERVAR LSB REGINT RSB ASSIGN REGFLOAT
+    {
+        int offset = getOffset(functionList,activeFunc, string($1), 0)+paramOffset;
+        fprintf(mips, "mul $t%s, $t%s, %d\n", $3+1, $3+1, INTSIZE);
+        fprintf(mips,"li $s1, %d\n", offset);
+        fprintf(mips,"addu $s0, $sp, $s1\n");
+        fprintf(mips,"sub $s0, $s0, $t%s\n", $3+1);
+        fprintf(mips,"sw $t%s, 0($s0)\n", $6+1);
     }
     | REGFLOAT ASSIGN USERVAR
     {
-        int offset = getOffset(functionList, activeFunc, string($3), 0);
-        fprintf(mips, "l.s $f%s, %d($sp)\n", $3+1, offset);
+        int offset = getOffset(functionList, activeFunc, string($3), 0)+paramOffset;
+        fprintf(mips, "l.s $f%s, %d($sp)\n", $1+1, offset);
     }
     | REGFLOAT ASSIGN CONVERTFLOAT LP REGINT RP
     {
@@ -281,7 +347,7 @@ FLOATASG: USERVAR ASSIGN REGFLOAT
         fprintf(mips, "c.eq.s $f%s, $f%s\n", $3+1, $5+1);
         fprintf(mips, "bc1f FLOAT%d\n", floatLabel);
         fprintf(mips, "li $t%c, 1\n", $1[1]);
-        fprintf(mips, "FLOAT%d\n", floatLabel);
+        fprintf(mips, "FLOAT%d:\n", floatLabel);
         floatLabel++;
     }
     | REGINT ASSIGN REGFLOAT NOTEQUAL REGFLOAT
@@ -290,7 +356,7 @@ FLOATASG: USERVAR ASSIGN REGFLOAT
         fprintf(mips, "c.eq.s $f%s, $f%s\n", $3+1, $5+1);
         fprintf(mips, "bc1f FLOAT%d\n", floatLabel);
         fprintf(mips, "li $t%c, 0\n", $1[1]);
-        fprintf(mips, "FLOAT%d\n", floatLabel);
+        fprintf(mips, "FLOAT%d:\n", floatLabel);
         floatLabel++;
     }
     | REGINT ASSIGN REGFLOAT AND REGFLOAT
@@ -302,7 +368,7 @@ FLOATASG: USERVAR ASSIGN REGFLOAT
         fprintf(mips, "c.eq.s $f%s, $f31\n", $5+1);
         fprintf(mips, "bc1f FLOAT%d\n", floatLabel);
         fprintf(mips, "li $t%c, 1\n", $1[1]);
-        fprintf(mips, "FLOAT%d\n", floatLabel);
+        fprintf(mips, "FLOAT%d:\n", floatLabel);
         floatLabel++;
     }
     | REGINT ASSIGN REGFLOAT OR REGFLOAT
@@ -314,7 +380,7 @@ FLOATASG: USERVAR ASSIGN REGFLOAT
         fprintf(mips, "c.eq.s $f%s, $f31\n", $5+1);
         fprintf(mips, "bc1f FLOAT%d\n", floatLabel);
         fprintf(mips, "li $t%c, 0\n", $1[1]);
-        fprintf(mips, "FLOAT%d\n", floatLabel);
+        fprintf(mips, "FLOAT%d:\n", floatLabel);
         floatLabel++;
     }
     | REGINT ASSIGN REGFLOAT LT REGFLOAT
@@ -323,7 +389,7 @@ FLOATASG: USERVAR ASSIGN REGFLOAT
         fprintf(mips, "c.lt.s $f%s, $f%s\n", $3+1, $5+1);
         fprintf(mips, "bc1f FLOAT%d\n", floatLabel);
         fprintf(mips, "li $t%c, 1\n", $1[1]);
-        fprintf(mips, "FLOAT%d\n", floatLabel);
+        fprintf(mips, "FLOAT%d:\n", floatLabel);
         floatLabel++;
     }
     | REGINT ASSIGN REGFLOAT GT REGFLOAT
@@ -332,7 +398,7 @@ FLOATASG: USERVAR ASSIGN REGFLOAT
         fprintf(mips, "c.le.s $f%s, $f%s\n", $3+1, $5+1);
         fprintf(mips, "bc1f FLOAT%d\n", floatLabel);
         fprintf(mips, "li $t%c, 0\n", $1[1]);
-        fprintf(mips, "FLOAT%d\n", floatLabel);
+        fprintf(mips, "FLOAT%d:\n", floatLabel);
         floatLabel++;
     }
     | REGINT ASSIGN REGFLOAT LE REGFLOAT
@@ -341,7 +407,7 @@ FLOATASG: USERVAR ASSIGN REGFLOAT
         fprintf(mips, "c.le.s $f%s, $f%s\n", $3+1, $5+1);
         fprintf(mips, "bc1f FLOAT%d\n", floatLabel);
         fprintf(mips, "li $t%c, 1\n", $1[1]);
-        fprintf(mips, "FLOAT%d\n", floatLabel);
+        fprintf(mips, "FLOAT%d:\n", floatLabel);
         floatLabel++;
     }
     | REGINT ASSIGN REGFLOAT GE REGFLOAT
@@ -350,22 +416,36 @@ FLOATASG: USERVAR ASSIGN REGFLOAT
         fprintf(mips, "c.lt.s $f%s, $f%s\n", $3+1, $5+1);
         fprintf(mips, "bc1f FLOAT%d\n", floatLabel);
         fprintf(mips, "li $t%c, 0\n", $1[1]);
-        fprintf(mips, "FLOAT%d\n", floatLabel);
+        fprintf(mips, "FLOAT%d:\n", floatLabel);
         floatLabel++;
     }
 ;
 
 IFSTMT: IF REGINT EQUAL REGINT GOTO LABEL
     {
-        fprintf(mips, "beq $t%c, $t%c, %s", $2[1], $4[1], $6);
+        fprintf(mips, "beq $t%c, $t%c, %s\n", $2[1], $4[1], $6);
     }
     | IF REGINT NOTEQUAL REGINT GOTO LABEL
     {
-        fprintf(mips, "bne $t%c, $t%c, %s", $2[1], $4[1], $6);
+        fprintf(mips, "bne $t%c, $t%c, %s\n", $2[1], $4[1], $6);
     }
     | IF REGINT EQUAL NUMINT GOTO LABEL
     {
-        fprintf(mips, "beq $t%c, $0, %s\n", $2[1], $6);
+        fprintf(mips, "beq $t%c, %s, %s\n", $2[1], $4, $6);
+    }
+    | IF REGINT NOTEQUAL NUMINT GOTO LABEL
+    {
+        fprintf(mips, "bne $t%c, %s, %s\n", $2[1], $4, $6);
+    }
+    | IF REGFLOAT EQUAL REGFLOAT GOTO LABEL
+    {
+        fprintf(mips, "li $s0, 1\n");
+        fprintf(mips, "c.eq.s $f%s, $f%s\n", $2+1, $4+1);
+        fprintf(mips, "bc1t FLOAT%d\n", floatLabel);
+        fprintf(mips, "li $s0, 0\n");
+        fprintf(mips, "FLOAT%d:\n", floatLabel);
+        fprintf(mips, "beq $s0, 1, %s\n", $6);
+        floatLabel++;
     }
     | IF REGFLOAT NOTEQUAL REGFLOAT GOTO LABEL
     {
@@ -373,29 +453,31 @@ IFSTMT: IF REGINT EQUAL REGINT GOTO LABEL
         fprintf(mips, "c.eq.s $f%s, $f%s\n", $2+1, $4+1);
         fprintf(mips, "bc1f FLOAT%d\n", floatLabel);
         fprintf(mips, "li $s0, 0\n");
-        fprintf(mips, "FLOAT%d\n", floatLabel);
-        fprintf(mips, "beq $s0, $0, %s\n", $6);
-        floatLabel++;
-    }
-    IF REGFLOAT EQUAL REGFLOAT GOTO LABEL
-    {
-        fprintf(mips, "li $s0, 1\n");
-        fprintf(mips, "c.eq.s $f%s, $f%s\n", $2+1, $4+1);
-        fprintf(mips, "bc1f FLOAT%d\n", floatLabel);
-        fprintf(mips, "li $s0, 0\n");
-        fprintf(mips, "FLOAT%d\n", floatLabel);
+        fprintf(mips, "FLOAT%d:\n", floatLabel);
         fprintf(mips, "beq $s0, 1, %s\n", $6);
         floatLabel++;
     }
     | IF REGFLOAT EQUAL NUMINT GOTO LABEL
     {
-        fprintf(mips, "mtc1 $0, $f31");
-        fprintf(mips, "cvt.s.w $f31, $f31");
+        fprintf(mips, "mtc1 $0, $f31\n");
+        fprintf(mips, "cvt.s.w $f31, $f31\n");
         fprintf(mips, "li $s0, 1\n");
         fprintf(mips, "c.eq.s $f%s, $f31\n", $2+1);
-        fprintf(mips, "bc1f FLOAT%d\n", floatLabel);
+        fprintf(mips, "bc1t FLOAT%d\n", floatLabel);
         fprintf(mips, "li $s0, 0\n");
-        fprintf(mips, "FLOAT%d\n", floatLabel);
+        fprintf(mips, "FLOAT%d:\n", floatLabel);
+        fprintf(mips, "beq $s0, 1, %s\n", $6);
+        floatLabel++;
+    }
+    | IF REGFLOAT NOTEQUAL NUMINT GOTO LABEL
+    {
+        fprintf(mips, "mtc1 $0, $f31\n");
+        fprintf(mips, "cvt.s.w $f31, $f31\n");
+        fprintf(mips, "li $s0, 1\n");
+        fprintf(mips, "c.eq.s $f%s, $f31\n", $2+1);
+        fprintf(mips, "bc1f FLOAT%d\n", floatLabel); // goto label float when equal to 0
+        fprintf(mips, "li $s0, 0\n");
+        fprintf(mips, "FLOAT%d:\n", floatLabel);
         fprintf(mips, "beq $s0, 1, %s\n", $6);
         floatLabel++;
     }
@@ -423,10 +505,15 @@ void yyerror(char *s)
 
 int main(int argc, char **argv)
 {
-    mips = fopen("./mips.s", "w");
+    mips = fopen("mips.s", "w");
+    fflush(mips);
+    fprintf(mips,".data\n");
+    fprintf(mips,"endline: .asciiz \"\\n\"\n");
     fprintf(mips,".text\n");
     readSymbolTable(functionList);
     paramOffset = 0;
     floatLabel = 0;
     yyparse();
+    fflush(mips);
+    fclose(mips);
 }

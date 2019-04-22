@@ -93,11 +93,19 @@ void merge(vector<int> *&receiver, vector<int> *&donor) {
         // cout<<"Conitnued because vector empty"<<endl;
         return;
     }
-    // cout<<"Here1"<<endl;
-    // vector<int> s;
-    // cout<<(donor->size());
     for(int i:(*donor)){
-        // cout<<"pushed into reciever"<<endl;
+        receiver->push_back(i);
+    }
+    donor->clear();
+    return;
+}
+
+void mergeSwitch(vector<pair<string,int>> *&receiver,vector<pair<string,int>> *&donor) {
+    if(donor==NULL || receiver == NULL){
+        // cout<<"Conitnued because vector empty"<<endl;
+        return;
+    }
+    for(auto i:(*donor)){
         receiver->push_back(i);
     }
     donor->clear();

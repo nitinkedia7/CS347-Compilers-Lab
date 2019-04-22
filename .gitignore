@@ -6,3 +6,5 @@ reference/
 CS347-Assignment-3/oreilly/
 **/input/test.c
 ./miniC/firstPass/switchworkwithbreak.y
+./miniC/firstPass/tempInter.txt
+./miniC/secondPass/mips.s

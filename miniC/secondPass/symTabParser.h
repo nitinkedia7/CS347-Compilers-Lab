@@ -1,9 +1,13 @@
-#include <bits/stdc++.h>
+#include <iostream>
+#include <vector>
+#include <stack>
+#include <stdio.h>
+#include <fstream>
 using namespace std;
 
 enum eletype {INTEGER, FLOATING, NULLVOID, BOOLEAN, ERRORTYPE};
 enum varType {SIMPLE, ARRAY};
-enum Tag{PARAMAETER, VARIABLE};
+enum Tag {PARAMAETER, VARIABLE};
 
 struct typeRecord {
     string name;
@@ -25,6 +29,7 @@ string eletypeMapper(eletype a);
 int eletypeIntMapper(eletype a);
 eletype getEleType(string x);
 
+int getParamOffset(vector<funcEntry> &functionList, string functionName);
 void readSymbolTable(vector<funcEntry> &functionList);
 int getOffset(vector<funcEntry> &functionList, string functionName, string variableName, int internalOffset);
 int getFunctionOffset(vector<funcEntry> &functionList, string functionName);

@@ -80,7 +80,7 @@ void printVector(vector<funcEntry> &functionprintList){
 
 void readSymbolTable(vector<funcEntry> &functionList){
     ifstream myfile;
-    myfile.open ("../firstPass/symtab.txt");
+    myfile.open ("../firstPass/output/symtab.txt");
     string a;
     while(myfile >> a){
         if(a=="$$"){
@@ -119,4 +119,13 @@ void readSymbolTable(vector<funcEntry> &functionList){
             functionList.push_back(p);
         }
     }
+}
+
+int getParamOffset(vector<funcEntry> &functionList, string functionName){
+    for(auto it : functionList){
+        if(it.name == functionName){
+            return 4*(it.numOfParam);
+        }
+    } 
+    return 0;
 }

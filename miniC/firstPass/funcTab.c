@@ -250,10 +250,16 @@ void populateOffsets(vector<funcEntry*> &funcEntryRecord){
 
 void printSymbolTable(vector<funcEntry*> &funcEntryRecord){
     ofstream symbolTable;
-    symbolTable.open("./output/symtab.txt");
+    symbolTable.open("output/symtab.txt");
+    symbolTable.flush();
     for(auto &funcRecord : funcEntryRecord){
         symbolTable << "$$" << endl;
-        symbolTable << "_" << funcRecord->name << " " << eletypeMapper(funcRecord->returnType) << " ";
+        if(funcRecord->name != "main"){
+            symbolTable << "_" << funcRecord->name << " " << eletypeMapper(funcRecord->returnType) << " ";
+        }
+        else{
+            symbolTable << funcRecord->name << " " << eletypeMapper(funcRecord->returnType) << " ";
+        }
         symbolTable << funcRecord->numOfParam << " " << funcRecord->functionOffset << endl;
         symbolTable << "$1" << endl;
         for(auto &varRecord : funcRecord->parameterList){
@@ -266,5 +272,6 @@ void printSymbolTable(vector<funcEntry*> &funcEntryRecord){
             symbolTable << varRecord->scope << " " << varRecord->varOffset << endl;
         }
     }
+    symbolTable.flush();
     symbolTable.close();
 }

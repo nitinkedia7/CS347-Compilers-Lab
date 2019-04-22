@@ -1,6 +1,12 @@
 %{
 #pragma GCC diagnostic ignored "-Wwrite-strings"
-#include <bits/stdc++.h>
+#include <iostream>
+#include <vector>
+#include <stack>
+#include <stdio.h>
+#include <algorithm>
+#include <utility>
+#include <fstream>
 #include "funcTab.h"
 #include "codegenHelpers.h"
 using namespace std;
@@ -16,8 +22,9 @@ int offsetCalc;
 string text;
 eletype resultType;
 vector<typeRecord*> typeRecordList;
+stack<vector<typeRecord*> > paramListStack;
 typeRecord* varRecord;
-vector<int> dimlist;
+vector<int> decdimlist;
 
 int nextquad;
 vector<string> functionInstruction;
@@ -32,6 +39,8 @@ bool errorFound;
 int numberOfParameters;
 string conditionVar;
 vector<string> switchVar;
+vector<funcEntry*> callFuncPtrList;
+vector<string> dimlist;
 
 vector<pair<string,int>> sVar;
 %} 
@@ -50,9 +59,13 @@ vector<pair<string,int>> sVar;
     struct expression expr;
     struct stmt stmtval;
     struct whileexp whileexpval;
+    struct shortcircuit shortCircuit;
+    struct switchcaser switchCase;
+    struct switchtemp switchTemp;
+    struct condition2temp ctemp;
 }
 
-%token INT FLOAT VOID NUMFLOAT NUMINT ID NEWLINE
+%token INT FLOAT VOID NUMFLOAT NUMINT ID NEWLINE READ PRINT
 %token COLON QUESTION DOT LCB RCB LSB RSB LP RP SEMI COMMA ASSIGN
 %token IF ELSE CASE BREAK DEFAULT CONTINUE WHILE FOR RETURN SWITCH MAIN
 %token LSHIFT RSHIFT PLUSASG MINASG MULASG MODASG DIVASG INCREMENT DECREMENT XOR BITAND BITOR PLUS MINUS DIV MUL MOD
@@ -61,10 +74,14 @@ vector<pair<string,int>> sVar;
 %type <idName> NUMFLOAT
 %type <idName> NUMINT
 %type <idName> ID
-%type <expr> EXPR2 TERM FACTOR ID_ARR ASG ASG1 EXPR1 EXPR21 CONDITION1 CONDITION2 LHS FUNC_CALL
+%type <expr> EXPR2 TERM FACTOR ID_ARR ASG ASG1 EXPR1 EXPR21 LHS FUNC_CALL BR_DIMLIST
 %type <whileexpval> WHILEEXP IFEXP N3 P3 Q3 FOREXP TEMP1
-%type <stmtval> BODY WHILESTMT IFSTMT M2 FORLOOP STMT STMT_LIST CASELIST
+%type <stmtval> BODY WHILESTMT IFSTMT M2 FORLOOP STMT STMT_LIST
 %type <quad> M1 M3 Q4 
+%type <shortCircuit> CONDITION1 CONDITION2
+%type <switchCase> CASELIST
+%type <switchTemp> TEMP2
+%type <ctemp> TP1
 %%
 
 MAIN_PROG: PROG MAINFUNCTION
@@ -77,7 +94,7 @@ PROG: PROG FUNC_DEF
 
 MAINFUNCTION: MAIN_HEAD LCB BODY RCB
     {
-        // printFunction(activeFuncPtr);
+        // Function(activeFuncPtr);
         deleteVarList(activeFuncPtr, scope);
         activeFuncPtr=NULL;
         scope=0;
@@ -114,7 +131,7 @@ MAIN_HEAD: INT MAIN LP RP
 
 FUNC_DEF: FUNC_HEAD LCB BODY RCB
     {
-        // printFunction(activeFuncPtr);
+        // Function(activeFuncPtr);
         deleteVarList(activeFuncPtr, scope);
         activeFuncPtr=NULL;
         scope=0;
@@ -214,7 +231,7 @@ STMT_LIST: STMT_LIST STMT
         {
             $$.nextList = new vector<int>;
             merge($$.nextList, $1.nextList);
-             merge($$.nextList, $2.nextList);
+            merge($$.nextList, $2.nextList);
             $$.breakList = new vector<int>;
             merge($$.breakList, $1.breakList);
             merge($$.breakList, $2.breakList);
@@ -313,6 +330,56 @@ STMT: VAR_DECL{
             }
         }   
     }
+    | READ ID_ARR SEMI
+    {
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+        if($2.type == ERRORTYPE){
+            errorFound = true;
+        }
+        else{
+            string registerName;
+            if ($2.type == INTEGER){
+                registerName = tempSet.getRegister();
+            }
+            else {
+                registerName = tempSet.getFloatRegister();
+            }
+            string s = registerName + " = " + (*($2.registerName)) ;
+            gen(functionInstruction, s, nextquad);
+            s = "read " + registerName;
+            gen(functionInstruction, s, nextquad);
+            s = (*($2.registerName)) + " = " +  registerName;
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(registerName);
+            if ($2.offsetRegName != NULL) tempSet.freeRegister(*($2.offsetRegName));
+        }
+    }
+    | PRINT ID_ARR SEMI
+    {
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+        if($2.type == ERRORTYPE){
+            errorFound = true;
+        }
+        else{
+            string registerName;
+            if ($2.type == INTEGER){
+                registerName = tempSet.getRegister();
+            }
+            else {
+                registerName = tempSet.getFloatRegister();
+            }
+            string s = registerName + " = " + (*($2.registerName)) ;
+            gen(functionInstruction, s, nextquad);
+            s = "print " + registerName;
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(registerName);
+            if ($2.offsetRegName != NULL) tempSet.freeRegister(*($2.offsetRegName));
+        }
+    }   
 ;
 
 VAR_DECL: D SEMI 
@@ -453,7 +520,7 @@ DEC_ID_ARR: ID
             typeRecordList.push_back(varRecord);
         }
     }
-    | ID BR_DIMLIST
+    | ID DEC_BR_DIMLIST
     {  
         int found = 0;
         typeRecord* vn = NULL;
@@ -466,7 +533,7 @@ DEC_ID_ARR: ID
                 if(vn->eleType == resultType){
                     vn->isValid=true;
                     int a=1;
-                    for(auto it : dimlist){
+                    for(auto it : decdimlist){
                         a*=(it);
                     }
                     vn->maxDimlistOffset = max(vn->maxDimlistOffset,a);
@@ -474,7 +541,7 @@ DEC_ID_ARR: ID
                         vn->dimlist.clear();           
                     }
                     vn->type=ARRAY;
-                    vn->dimlist = dimlist;
+                    vn->dimlist = decdimlist;
                 }
                 else {
                     varRecord = new typeRecord;
@@ -482,10 +549,10 @@ DEC_ID_ARR: ID
                     varRecord->type = ARRAY;
                     varRecord->tag = VARIABLE;
                     varRecord->scope = scope;
-                    varRecord->dimlist = dimlist;
+                    varRecord->dimlist = decdimlist;
                     varRecord->isValid=true;
                     int a=1;
-                    for(auto it : dimlist){
+                    for(auto it : decdimlist){
                         a*=(it);
                     }
                     varRecord->maxDimlistOffset = a;
@@ -506,10 +573,10 @@ DEC_ID_ARR: ID
                 varRecord->type = ARRAY;
                 varRecord->tag = VARIABLE;
                 varRecord->scope = scope;
-                varRecord->dimlist = dimlist;
+                varRecord->dimlist = decdimlist;
                 varRecord->isValid=true;
                 int a=1;
-                for(auto it : dimlist){
+                for(auto it : decdimlist){
                     a*=(it);
                 }
                 varRecord->maxDimlistOffset = a;
@@ -523,26 +590,26 @@ DEC_ID_ARR: ID
             varRecord->type = ARRAY;
             varRecord->tag = VARIABLE;
             varRecord->scope = scope;
-            varRecord->dimlist = dimlist;
+            varRecord->dimlist = decdimlist;
             varRecord->isValid=true;
             int a=1;
-            for(auto it : dimlist){
+            for(auto it : decdimlist){
                 a*=(it);
             }
             varRecord->maxDimlistOffset = a;
             typeRecordList.push_back(varRecord);
         }
-        dimlist.clear();  
+        decdimlist.clear();  
     } 
 ;
 
-BR_DIMLIST: LSB NUMINT RSB
+DEC_BR_DIMLIST: LSB NUMINT RSB
     {
-        dimlist.push_back(atoi($2));
+        decdimlist.push_back(atoi($2));
     }
-    | BR_DIMLIST LSB NUMINT RSB 
+    | DEC_BR_DIMLIST LSB NUMINT RSB 
     {
-        dimlist.push_back(atoi($3));
+        decdimlist.push_back(atoi($3));
     }
 ;
 
@@ -565,11 +632,6 @@ FUNC_CALL: ID LP PARAMLIST RP
         }
         else {
             $$.type = callFuncPtr->returnType;
-            // reverse(typeRecordList.begin(),typeRecordList.end());
-            for(auto it : typeRecordList){
-                gen(functionInstruction, "param " + it->name , nextquad);   
-                tempSet.freeRegister(it->name);
-            }
             int isRefParam = 0;
             if(callFuncPtr->returnType == INTEGER){
                 $$.registerName = new string(tempSet.getRegister());
@@ -580,10 +642,11 @@ FUNC_CALL: ID LP PARAMLIST RP
                 isRefParam++;
             }
             gen(functionInstruction, "refparam " + (*($$.registerName)), nextquad);
-            gen(functionInstruction, "call _" + callFuncPtr->name + ", " + to_string(typeRecordList.size() + isRefParam ), nextquad);            
+            gen(functionInstruction, "call _" + callFuncPtr->name + ", " + to_string(typeRecordList.size() + isRefParam ), nextquad);       
         }
-        cout<<"t1 "<<endl;
         typeRecordList.clear();
+        typeRecordList.swap(paramListStack.top());
+        paramListStack.pop();
     }
 ;
 
@@ -595,19 +658,29 @@ PLIST: PLIST COMMA ASG
     {
         varRecord = new typeRecord;
         varRecord->eleType = $3.type;
-        if ($3.type != ERRORTYPE) {
+        if ($3.type == ERRORTYPE) {
+            errorFound = true;
+        }
+        else {
             varRecord->name = *($3.registerName);
             varRecord->type = SIMPLE;
+            gen(functionInstruction, "param " +  *($3.registerName), nextquad);   
+            tempSet.freeRegister(*($3.registerName));
         }
         typeRecordList.push_back(varRecord);
     }
-    | ASG
+    | {paramListStack.push(typeRecordList); typeRecordList.clear();} ASG
     {
         varRecord = new typeRecord;
-        varRecord->eleType = $1.type;
-        if ($1.type != ERRORTYPE) {
-            varRecord->name = *($1.registerName);
+        varRecord->eleType = $2.type;
+        if ($2.type == ERRORTYPE) {
+            errorFound = true;
+        }
+        else {
+            varRecord->name = *($2.registerName);
             varRecord->type = SIMPLE; 
+            gen(functionInstruction, "param " +  *($2.registerName), nextquad);   
+            tempSet.freeRegister(*($2.registerName));
         }
         typeRecordList.push_back(varRecord);
     }
@@ -618,6 +691,20 @@ ASG: CONDITION1
         $$.type = $1.type;
         if($$.type != ERRORTYPE) {
             $$.registerName = $1.registerName;
+            // backpatch($1.jumpList, nextquad, functionInstruction);
+            // gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+            if($1.jumpList!=NULL){
+                vector<int>* qList = new vector<int>;
+                // gen(functionInstruction,(*($$.registerName)) + " = 0",nextquad) ;
+                qList->push_back(nextquad);
+                gen(functionInstruction,"goto L",nextquad);
+                backpatch($1.jumpList, nextquad, functionInstruction);
+                gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+                gen(functionInstruction,(*($$.registerName)) + " = 1",nextquad) ;
+                backpatch(qList,nextquad,functionInstruction);
+                qList->clear();
+                gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+            }
         }
     }
     | LHS ASSIGN ASG
@@ -652,6 +739,7 @@ ASG: CONDITION1
             string s = (*($1.registerName)) + " = " + registerName ;
             gen(functionInstruction, s, nextquad);
             $$.registerName = new string(registerName);
+            if ($1.offsetRegName != NULL) tempSet.freeRegister(*($1.offsetRegName));
         }
     }
     | LHS PLUSASG ASG
@@ -666,6 +754,7 @@ LHS: ID_ARR
         $$.type = $1.type;
         if ($$.type != ERRORTYPE) {
             $$.registerName = $1.registerName;
+            $$.offsetRegName = $1.offsetRegName;
         } 
     } 
 ;
@@ -681,15 +770,18 @@ SWITCHCASE: SWITCH LP ASG RP TEMP1 LCB  CASELIST RCB
         gen(functionInstruction, "goto L", nextquad);
         backpatch($5.falseList, nextquad, functionInstruction);
         gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
-        for(auto it : sVar){
+        reverse($7.casepair->begin(), $7.casepair->end());
+        for(auto it : *($7.casepair)){
             if(it.first == "default"){
                 gen(functionInstruction, "goto L"+to_string(it.second), nextquad);
-                break;
+                // break;
             }
-            gen(functionInstruction, "if "+ (*($3.registerName)) +" == "+ it.first + " goto L" + to_string(it.second), nextquad);
+            else{
+                gen(functionInstruction, "if "+ (*($3.registerName)) +" == "+ it.first + " goto L" + to_string(it.second), nextquad);
+            }
             // tempSet.freeRegister(it.first);            
         }
-        sVar.clear();
+        $7.casepair->clear();
         backpatch(qList, nextquad, functionInstruction);
         backpatch($7.breakList, nextquad, functionInstruction);
         gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
@@ -715,9 +807,17 @@ TEMP1: %empty
     }
 ;
 
-CASELIST:   
-    CASE NUMINT {
-        sVar.push_back(make_pair(string($2), nextquad));
+TEMP2:%empty
+    {
+        $$.casepair = new vector<pair<string,int>>;
+
+    }
+;
+
+CASELIST:
+    CASE MINUS NUMINT TEMP2 {
+        // sVar.push_back(make_pair(string($2), nextquad));
+        $4.casepair->push_back(make_pair("-"+string($3), nextquad));
         gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
         } COLON BODY 
     CASELIST
@@ -725,31 +825,64 @@ CASELIST:
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
-        merge($$.continueList,$5.continueList);
-        merge($$.breakList, $5.breakList);
-        merge($$.nextList, $5.nextList);
+        $$.casepair = new vector<pair<string,int>>;
+        // $$.casepair->push_back(make_pair(string($2), nextquad));
+        merge($$.continueList,$8.continueList);
+        merge($$.breakList, $8.breakList);
+        merge($$.nextList, $8.nextList);
+        merge($$.continueList,$7.continueList);
+        merge($$.breakList, $7.breakList);
+        merge($$.nextList, $7.nextList);
+        mergeSwitch($$.casepair, $8.casepair);
+        mergeSwitch($$.casepair, $4.casepair);
+        // sVar.clear();
+    }
+    |
+    CASE NUMINT TEMP2 {
+        // sVar.push_back(make_pair(string($2), nextquad));
+        $3.casepair->push_back(make_pair(string($2), nextquad));
+        gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+        } COLON BODY 
+    CASELIST
+    {
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+        $$.casepair = new vector<pair<string,int>>;
+        // $$.casepair->push_back(make_pair(string($2), nextquad));
         merge($$.continueList,$6.continueList);
         merge($$.breakList, $6.breakList);
         merge($$.nextList, $6.nextList);
+        merge($$.continueList,$7.continueList);
+        merge($$.breakList, $7.breakList);
+        merge($$.nextList, $7.nextList);
+        mergeSwitch($$.casepair, $7.casepair);
+        mergeSwitch($$.casepair, $3.casepair);
+        // sVar.clear();
     }
     | %empty
     {
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
+        $$.casepair = new vector<pair<string,int>>;
     }
-    | DEFAULT COLON {
-        sVar.push_back(make_pair("default", nextquad));
+    | DEFAULT COLON TEMP2 {
+        $3.casepair->push_back(make_pair("default", nextquad));
+        // sVar.push_back(make_pair("default", nextquad));
         gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
     }
      BODY {
         // gen(functionInstruction, "L" + to_string(nextquad)+":", nextquad);
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
+        $$.casepair = new vector<pair<string,int>>;
         $$.continueList = new vector <int>;
-        merge($$.continueList,$4.continueList);
-        merge($$.breakList, $4.breakList);
-        merge($$.nextList, $4.nextList);
+        merge($$.continueList,$5.continueList);
+        merge($$.breakList, $5.breakList);
+        merge($$.nextList, $5.nextList);
+        mergeSwitch($$.casepair, $3.casepair);
+        // sVar.clear();
     }
 ;
 
@@ -950,48 +1083,116 @@ WHILEEXP: WHILE M1 LP ASG RP
     }
 ;
 
-CONDITION1: CONDITION2 OR CONDITION1
+TP1: %empty
+{
+    $$.temp = new vector<int>;
+}
+;
+
+CONDITION1: CONDITION1 TP1
     {
-        if($1.type==ERRORTYPE || $3.type==ERRORTYPE){
+        if($1.type!=ERRORTYPE){
+            $2.temp->push_back(nextquad);
+            gen(functionInstruction, "if " + *($1.registerName) + "!= 0 goto L", nextquad);
+
+        }
+    }
+     OR CONDITION2
+    {
+        if($1.type==ERRORTYPE || $5.type==ERRORTYPE){
             $$.type = ERRORTYPE;
         }
         else{
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());
-            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " || " + (*($3.registerName)) ;   
-            gen(functionInstruction, s, nextquad);
+            vector<int>* qList = new vector<int>;
+            if($5.jumpList!=NULL){
+                // gen(functionInstruction,(*($$.registerName)) + " =  x 1",nextquad) ;
+                qList->push_back(nextquad);
+                gen(functionInstruction,"goto L",nextquad);
+                backpatch($5.jumpList, nextquad, functionInstruction);
+                gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+                gen(functionInstruction,(*($5.registerName)) + " = 0",nextquad) ;
+                backpatch(qList,nextquad,functionInstruction);
+                gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+                qList->clear();
+            }
+            
+            $$.jumpList = new vector<int>;
+            merge($$.jumpList,$1.jumpList);
+            
+            
+            // ($$.jumpList)->push_back(nextquad);
+            // gen(functionInstruction, "if " + *($1.registerName) + "!= 0 goto L", nextquad);
+            merge($$.jumpList, $2.temp);
+            ($$.jumpList)->push_back(nextquad);
+            gen(functionInstruction, "if " + *($5.registerName) + "!= 0 goto L", nextquad);
+            string s = (*($$.registerName)) + " = 0";   
+            gen(functionInstruction,s,nextquad);
             tempSet.freeRegister(*($1.registerName));
-            tempSet.freeRegister(*($3.registerName)); 
+            tempSet.freeRegister(*($5.registerName)); 
         }
     }
     | CONDITION2
     {
         $$.type = $1.type;
         if ($$.type != ERRORTYPE) {
-            $$.registerName = $1.registerName;    
+            $$.registerName = $1.registerName; 
+            if($1.jumpList!=NULL){
+                vector<int>* qList = new vector<int>;
+                qList->push_back(nextquad);
+                gen(functionInstruction,"goto L",nextquad);
+                backpatch($1.jumpList, nextquad, functionInstruction);
+                gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+                gen(functionInstruction,(*($$.registerName)) + " = 0",nextquad) ;
+                backpatch(qList,nextquad,functionInstruction);
+                gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
+                qList->clear();   
+            }
         }
     }
 ;  
 
-CONDITION2: EXPR1 AND CONDITION2
+
+CONDITION2: CONDITION2 TP1
     {
-        if ($1.type==ERRORTYPE || $3.type==ERRORTYPE) {
+      if ($1.type!=ERRORTYPE ){
+
+          ($2.temp)->push_back(nextquad);
+         gen(functionInstruction, "if " + *($1.registerName) + " == 0 " +" goto L", nextquad);
+      } 
+    }
+    AND EXPR1 
+    {
+        if ($1.type==ERRORTYPE || $5.type==ERRORTYPE) {
             $$.type = ERRORTYPE;
         }
         else{
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());
-            string s = (*($$.registerName)) + " = " + (*($1.registerName)) + " && " + (*($3.registerName)) ;   
-            gen(functionInstruction, s, nextquad);
+            $$.jumpList = new vector<int>;
+            merge($$.jumpList,$1.jumpList);
+            vector<int>* qList = new vector<int>;
+            
+            // ($$.jumpList)->push_back(nextquad);
+            // gen(functionInstruction, "if " + *($1.registerName) + " == 0 " +" goto L", nextquad);
+            merge($$.jumpList, $2.temp);
+            ($$.jumpList)->push_back(nextquad);
+            gen(functionInstruction, "if " + *($5.registerName) + " == 0 "+" goto L", nextquad);
+
+            string s = (*($$.registerName)) + " = 1";   
+            gen(functionInstruction,s,nextquad);
             tempSet.freeRegister(*($1.registerName));
-            tempSet.freeRegister(*($3.registerName));   
+            tempSet.freeRegister(*($5.registerName));   
         }
     }
     | EXPR1
     {
         $$.type = $1.type;
         if ($$.type != ERRORTYPE) {
-            $$.registerName = $1.registerName;    
+            $$.registerName = $1.registerName; 
+            $$.jumpList = new vector<int>;
+            $$.jumpList=NULL;   
         }
     }
 ;
@@ -1286,7 +1487,7 @@ TERM: TERM MUL FACTOR
                 $$.type = ERRORTYPE;
             }
         }   
-    } 
+    }  
     | TERM MOD FACTOR
     {
         if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
@@ -1328,8 +1529,11 @@ FACTOR: ID_ARR
         else $$.registerName = new string(tempSet.getFloatRegister());
         string s = (*($$.registerName)) + " = " + (*($1.registerName)) ;
         gen(functionInstruction, s, nextquad);
+        if($1.offsetRegName != NULL){
+            tempSet.freeRegister((*($1.offsetRegName)));
+        }
     }
-    |MINUS ID_ARR
+    | MINUS ID_ARR
     {
         $$.type = $2.type;
         if ($$.type == INTEGER)
@@ -1337,6 +1541,9 @@ FACTOR: ID_ARR
         else $$.registerName = new string(tempSet.getFloatRegister());
         string s = (*($$.registerName)) + " = -" + (*($2.registerName)) ;
         gen(functionInstruction, s, nextquad);
+        if($2.offsetRegName != NULL){
+            tempSet.freeRegister((*($2.offsetRegName)));
+        }
     }
     | MINUS NUMINT
     {
@@ -1366,9 +1573,8 @@ FACTOR: ID_ARR
         string s = (*($$.registerName)) + " = " + string($1) ;
         gen(functionInstruction, s, nextquad);  
     }
-    |  FUNC_CALL 
+    | FUNC_CALL 
     { 
-        // TODO
         $$.type = $1.type; 
         if($1.type != ERRORTYPE && $1.type != NULLVOID){
             $$.registerName = $1.registerName;
@@ -1396,6 +1602,9 @@ FACTOR: ID_ARR
             s = (*($1.registerName)) + " = " + newReg2; // i = T3
             gen(functionInstruction, s, nextquad);
             tempSet.freeRegister(newReg2);
+            if($1.offsetRegName != NULL){
+                tempSet.freeRegister((*($1.offsetRegName)));
+            }
         }
         else {
             $$.type = ERRORTYPE;
@@ -1408,18 +1617,21 @@ FACTOR: ID_ARR
             $$.type = INTEGER;   
             string newReg = tempSet.getRegister();
             $$.registerName = new string(newReg);
-            string s = newReg + " = " + (*($1.registerName)) ;
+            string s = newReg + " = " + (*($1.registerName)); // T0 = i
             gen(functionInstruction, s, nextquad);
             string newReg2 = tempSet.getRegister();
             s = newReg2 + " = " + newReg + " - 1"; // T3 = T2+1
             gen(functionInstruction, s, nextquad);
             s = (*($1.registerName)) + " = " + newReg2; // i = T3
             gen(functionInstruction, s, nextquad);
-            tempSet.freeRegister(newReg2);     
+            tempSet.freeRegister(newReg2); 
+            if($1.offsetRegName != NULL){
+                tempSet.freeRegister((*($1.offsetRegName)));
+            }    
         }
         else {
             $$.type = ERRORTYPE;
-            cout << "Cannot increment non-integer type variable" << endl; 
+            cout << "Cannot increment non-integer type variable " << *($1.registerName) << endl; 
         }
     } 
     | INCREMENT ID_ARR
@@ -1427,11 +1639,18 @@ FACTOR: ID_ARR
         if ($2.type == INTEGER) {
             $$.type = INTEGER;   
             string newReg = tempSet.getRegister();
-            $$.registerName = new string(newReg);
-            string s = newReg + " = " + (*($2.registerName)) + " + 1";
+            string s = newReg + " = " + (*($2.registerName)); // T2 = i
             gen(functionInstruction, s, nextquad);
-            s = (*($2.registerName)) + " = " + newReg ;
-            gen(functionInstruction, s, nextquad);      
+            string newReg2 = tempSet.getRegister();
+            $$.registerName = new string(newReg2);
+            s = newReg2 + " = " + newReg + " + 1"; // T3 = T2+1
+            gen(functionInstruction, s, nextquad);
+            s = (*($2.registerName)) + " = " + newReg2; // i = T3
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(newReg); 
+            if($2.offsetRegName != NULL){
+                tempSet.freeRegister((*($2.offsetRegName)));
+            }     
         }
         else {
             $$.type = ERRORTYPE;
@@ -1443,11 +1662,18 @@ FACTOR: ID_ARR
         if ($2.type == INTEGER) {
             $$.type = INTEGER;   
             string newReg = tempSet.getRegister();
-            $$.registerName = new string(newReg);
-            string s = newReg + " = " + (*($2.registerName)) + " - 1";
+            string s = newReg + " = " + (*($2.registerName)); // T2 = i
             gen(functionInstruction, s, nextquad);
-            s = (*($2.registerName)) + " = " + newReg ;
-            gen(functionInstruction, s, nextquad);        
+            string newReg2 = tempSet.getRegister();
+            $$.registerName = new string(newReg2);
+            s = newReg2 + " = " + newReg + " - 1"; // T3 = T2+1
+            gen(functionInstruction, s, nextquad);
+            s = (*($2.registerName)) + " = " + newReg2; // i = T3
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(newReg);
+            if($2.offsetRegName != NULL){
+                tempSet.freeRegister((*($2.offsetRegName)));
+            }         
         }
         else {
             $$.type = ERRORTYPE;
@@ -1462,6 +1688,7 @@ ID_ARR: ID
         int found = 0;
         typeRecord* vn = NULL;
         searchCallVariable(string($1), activeFuncPtr, found, vn); 
+        $$.offsetRegName = NULL;
         if(found){
             if (vn->type == SIMPLE) {
                 $$.type = vn->eleType;
@@ -1499,73 +1726,112 @@ ID_ARR: ID
         // retrieve the highest level id with same name in param list or var list
         int found = 0;
         typeRecord* vn = NULL;
-        searchCallVariable(string($1), activeFuncPtr, found, vn); 
-        if(found){
-            if (vn->type == ARRAY) {
-                if (dimlist.size() == vn->dimlist.size()) {
-                    $$.type = vn->eleType;
-                    // calculate linear address using dimensions then pass to FACTOR
-                    int offset = 0;
-                    for (int i = 0; i < vn->dimlist.size(); i++) {
-                        offset += dimlist[i];
-                        if (i != vn->dimlist.size()-1) offset *= vn->dimlist[i+1];  
-                    }
-                    string os = to_string(offset);
-                    string dataType = eletypeMapper($$.type);
-                    dataType += "_" + to_string(vn->scope);
-                    string s = "_" + string($1) + "_" + dataType;
-                    // string s = string($1) + "[" + os + "]";
-                    $$.registerName = new string(s); 
-                }
-                else {
-                    $$.type = ERRORTYPE;
-                    for (auto it : dimlist) {
-                        cout << it << " "; 
-                    }
-                    cout << endl;
-                    cout << "Dimension mismatch: " << $1 << " should have " << dimlist.size() <<" dimensions" << endl;
-                }
-            }
-            else {
-                $$.type = ERRORTYPE;
-                cout << $1 << " is declared as a singleton" << endl; 
-            }
+        $$.offsetRegName = NULL; 
+        if($2.type == ERRORTYPE){
+            errorFound = true;
+            $$.type = ERRORTYPE;
         }
-        else {
-            searchParam(string ($1), activeFuncPtr->parameterList, found, vn);
-            if (found) {
+        else{
+            searchCallVariable(string($1), activeFuncPtr, found, vn); 
+            if(found){
                 if (vn->type == ARRAY) {
                     if (dimlist.size() == vn->dimlist.size()) {
                         $$.type = vn->eleType;
                         // calculate linear address using dimensions then pass to FACTOR
-                        int offset = 0;
+                        string offsetRegister = tempSet.getRegister();
+                        string dimlistRegister = tempSet.getRegister();
+                        string s = offsetRegister + " = 0";
+                        gen(functionInstruction, s, nextquad);
                         for (int i = 0; i < vn->dimlist.size(); i++) {
-                            offset += dimlist[i];
-                            if (i != vn->dimlist.size()-1) offset *= vn->dimlist[i+1];  
+                            s = offsetRegister + " = " + offsetRegister + " + " + dimlist[i];
+                            gen(functionInstruction, s, nextquad);
+                            // offset += dimlist[i];
+                            if (i != vn->dimlist.size()-1) {
+                                // offset *= vn->dimlist[i+1];
+                                s = dimlistRegister + " = " + to_string(vn->dimlist[i+1]);
+                                gen(functionInstruction, s, nextquad);                                
+                                s = offsetRegister + " = " + offsetRegister + " * " + dimlistRegister;
+                                gen(functionInstruction, s, nextquad);
+                            }
+                            tempSet.freeRegister(dimlist[i]);
                         }
-                        string os = to_string(offset);
                         string dataType = eletypeMapper($$.type);
-                        dataType += "_" + to_string(vn->scope);
-                        string s = "_" + string($1) + "_" + dataType;
-                        // string s = string($1) + "[" + os + "]";
-                        $$.registerName = new string(s); 
+                        dataType += "_" + to_string(vn->scope); 
+                        s = "_" + string($1) + "_" + dataType ;
+                        s += "[" + offsetRegister + "]";
+                        $$.registerName = new string(s);
+                        tempSet.freeRegister(dimlistRegister);
+                        $$.offsetRegName = new string(offsetRegister);
+                        
                     }
                     else {
                         $$.type = ERRORTYPE;
-                        cout << "Dimension mismatch: " << $1 << "should have %d dimensions" << endl;
+                        cout << "Dimension mismatch: " << $1 << " should have " << dimlist.size() <<" dimensions" << endl;
                     }
                 }
                 else {
                     $$.type = ERRORTYPE;
-                    cout << $1 << " is declared as a singleton" << endl;
+                    cout << $1 << " is declared as a singleton" << endl; 
                 }
             }
             else {
                 $$.type = ERRORTYPE;
                 cout << "Undeclared identifier " << $1 << endl;
+                // searchParam(string ($1), activeFuncPtr->parameterList, found, vn);
+                // if (found) {
+                //     if (vn->type == ARRAY) {
+                //         if (dimlist.size() == vn->dimlist.size()) {
+                //             $$.type = vn->eleType;
+                //             // calculate linear address using dimensions then pass to FACTOR
+                //             int offset = 0;
+                //             for (int i = 0; i < vn->dimlist.size(); i++) {
+                //                 offset += dimlist[i];
+                //                 if (i != vn->dimlist.size()-1) offset *= vn->dimlist[i+1];  
+                //             }
+                //             string os = to_string(offset);
+                //             string dataType = eletypeMapper($$.type);
+                //             dataType += "_" + to_string(vn->scope);
+                //             string s = "_" + string($1) + "_" + dataType;
+                //             // string s = string($1) + "[" + os + "]";
+                //             $$.registerName = new string(s); 
+                //         }
+                //         else {
+                //             $$.type = ERRORTYPE;
+                //             cout << "Dimension mismatch: " << $1 << " should have " << dimlist.size() << " dimensions" << endl;
+                //         }
+                //     }
+                //     else {
+                //         $$.type = ERRORTYPE;
+                //         cout << $1 << " is declared as a singleton" << endl;
+                //     }
+                // }
+                // else {
+                //     $$.type = ERRORTYPE;
+                //     cout << "Undeclared identifier " << $1 << endl;
+                // }
             }
+            dimlist.clear();
         }
-        dimlist.clear();
+    }
+;
+
+BR_DIMLIST: LSB ASG RSB
+    {
+        if ($2.type == INTEGER) {
+            dimlist.push_back(*($2.registerName));
+        }
+        else {
+            cout << "One of the dimension of an array cannot be evaluated to integer" << endl;
+        }
+    }   
+    | BR_DIMLIST LSB ASG RSB 
+    {
+        if ($3.type == INTEGER) {
+            dimlist.push_back(*($3.registerName));
+        }
+        else {
+            cout << "One of the dimension of an array cannot be evaluated to integer" << endl;
+        }    
     }
 ;
 
@@ -1579,13 +1845,14 @@ void yyerror(char *s)
 
 int main(int argc, char **argv)
 {
-    dimlist.clear();
     nextquad = 0;
     scope = 0;
     found = 0;
     offsetCalc = 0;
     errorFound=false;
     switchVar.clear();
+    dimlist.clear();
+    
     if( remove( "tempInter.txt" ) != 0 )
     {
     }
@@ -1596,7 +1863,7 @@ int main(int argc, char **argv)
     populateOffsets(funcEntryRecord);
     ofstream outinter;
     outinter.open("./output/intermediate.txt");
-    if(!errorFound){
+    if(1){
         for(auto it:functionInstruction){
             outinter<<it<<endl;
         }

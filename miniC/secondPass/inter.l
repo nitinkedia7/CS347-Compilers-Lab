@@ -15,8 +15,9 @@
 "end"                          { printf(" <%s> ", yytext);return END; }
 "return"                       { printf(" <%s> ", yytext);return RETURN; }
 "convertToFloat"                { printf(" <%s> ", yytext);return CONVERTFLOAT; }
-"convertToInt"                { printf(" <%s> ", yytext);return CONVERTINT; }
-
+"convertToInt"                  { printf(" <%s> ", yytext);return CONVERTINT; }
+"print"                         { printf(" <%s> ", yytext);return PRINT;}
+"read"                         { printf(" <%s> ", yytext);return READ; }
 "<="                            { printf(" <%s> ", yytext);return LE; }
 ">="                            { printf(" <%s> ", yytext);return GE; }
 "=="                            { printf(" <%s> ", yytext);return EQUAL; }
@@ -34,13 +35,13 @@
 ">"                             { printf(" <%s> ", yytext);return GT; }
 "~"                             { printf(" <%s> ", yytext);return NEG; }
 "+"                             { printf(" <%s> ", yytext);return PLUS; }
-"-"                             { printf(" <%s> ", yytext);return MINUS; }
 "/"                             { printf(" <%s> ", yytext);return DIV; }
 "*"                             { printf(" <%s> ", yytext);return MUL; }
 "%"                             { printf(" <%s> ", yytext);return MOD; }
 
-[0-9]+\.[0-9]*                  { yylval.idName = (char *)malloc(100); memset(yylval.idName, 0, 100); memcpy(yylval.idName, yytext, yyleng); printf(" <%s> ", yytext);return NUMFLOAT; }
-[0-9]+                          { yylval.idName = (char *)malloc(100); memset(yylval.idName, 0, 100); memcpy(yylval.idName, yytext, yyleng); printf(" <%s> ", yytext);return NUMINT; }
+-[0-9]+\.[0-9]*|[0-9]+\.[0-9]*                  { yylval.idName = (char *)malloc(100); memset(yylval.idName, 0, 100); memcpy(yylval.idName, yytext, yyleng); printf(" <%s> ", yytext);return NUMFLOAT; }
+-[0-9]+|[0-9]+                          { yylval.idName = (char *)malloc(100); memset(yylval.idName, 0, 100); memcpy(yylval.idName, yytext, yyleng); printf(" <%s> ", yytext);return NUMINT; }
+"-"                             { printf(" <%s> ", yytext);return MINUS; }
 [T][0-9]+                       { yylval.idName = (char *)malloc(100); memset(yylval.idName, 0, 100); memcpy(yylval.idName, yytext, yyleng); printf(" <%s> ", yytext);return REGINT; }
 [F][0-9]+                       { yylval.idName = (char *)malloc(100); memset(yylval.idName, 0, 100); memcpy(yylval.idName, yytext, yyleng); printf(" <%s> ", yytext);return REGFLOAT; }
 [L][0-9]+                       { yylval.idName = (char *)malloc(100); memset(yylval.idName, 0, 100); memcpy(yylval.idName, yytext, yyleng); printf(" <%s> ", yytext);return LABEL; }   

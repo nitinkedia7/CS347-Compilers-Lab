@@ -6,12 +6,14 @@ int sum(int a, int b, int c, int d, int e, int f) {
     s = s + c;
     s = s + d;
     s = s + e;
+    s = s + f;
     return s;
 }
 
 int main() {
-    int a;
-    a=-1;
-    a=3-5;
-    return sum(1, 2, 3, 4, 5, 6);
+    int s,y; 
+    s = 0;
+    s = sum(s+1, s+2, s+3, s+4, s+5, sum(1,2,3,4,5,6));
+    y = sum(1,2,3,4,5,6);
+    return 0;
 }

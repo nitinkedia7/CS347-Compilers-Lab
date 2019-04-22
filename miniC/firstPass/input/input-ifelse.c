@@ -20,7 +20,7 @@ int main(){
     if(1){
         f++;
     }
-    if(a < 3 && ((f = 2) || (b >= 4))){
+    if(a < 3 && ((f = 9) || (b >= 4))){
         if(f >1){
             f++;
         }
@@ -36,4 +36,7 @@ int main(){
             f--;
         }
     }
+    print a;
+    print b;
+    print f;
 }

@@ -17,6 +17,8 @@
 "return"                        { printf(" <%s> ", yytext);return RETURN; }
 "switch"                        { printf(" <%s> ", yytext);return SWITCH; }
 "main"                          { printf(" <%s> ", yytext);return MAIN; }
+"read"                          { printf(" <%s> ", yytext);return READ; }
+"print"                         { printf(" <%s> ", yytext);return PRINT; }
 
 "{"                             { printf(" <%s> ", yytext);return LCB; }
 "}"                             { printf(" <%s> ", yytext);return RCB; }
@@ -37,7 +39,6 @@
 "++"                            { printf(" <%s> ", yytext);return INCREMENT; }
 "--"                            { printf(" <%s> ", yytext);return DECREMENT; }
 ":"                             { printf(" <%s> ", yytext);return COLON; }
-"?"                             { printf(" <%s> ", yytext);return QUESTION; }
 "["                             { printf(" <%s> ", yytext);return LSB; }
 "]"                             { printf(" <%s> ", yytext);return RSB; }
 "("                             { printf(" <%s> ", yytext);return LP; }
@@ -56,7 +57,7 @@
 "*"                             { printf(" <%s> ", yytext);return MUL; }
 "%"                             { printf(" <%s> ", yytext);return MOD; }
 
-[0-9]+\.[0-9]*                  { yylval.idName = (char *)malloc(100); memset(yylval.idName, 0, 100); memcpy(yylval.idName, yytext, yyleng); printf(" <%s> ", yytext); return NUMFLOAT; }
+[0-9]+\.[0-9]+                  { yylval.idName = (char *)malloc(100); memset(yylval.idName, 0, 100); memcpy(yylval.idName, yytext, yyleng); printf(" <%s> ", yytext); return NUMFLOAT; }
 [0-9]+                          { yylval.idName = (char *)malloc(100); memset(yylval.idName, 0, 100); memcpy(yylval.idName, yytext, yyleng); printf(" <%s> ", yytext); return NUMINT; }
 [a-zA-Z_][a-zA-Z_0-9]*          { yylval.idName = (char *)malloc(100); memset(yylval.idName, 0, 100); memcpy(yylval.idName, yytext, yyleng); printf(" <%s> ", yytext);return ID; }
 
