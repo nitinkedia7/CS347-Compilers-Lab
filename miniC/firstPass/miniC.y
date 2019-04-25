@@ -94,7 +94,6 @@ PROG: PROG FUNC_DEF
 
 MAINFUNCTION: MAIN_HEAD LCB BODY RCB
     {
-        // Function(activeFuncPtr);
         deleteVarList(activeFuncPtr, scope);
         activeFuncPtr=NULL;
         scope=0;
@@ -104,7 +103,7 @@ MAINFUNCTION: MAIN_HEAD LCB BODY RCB
 ;
 
 MAIN_HEAD: INT MAIN LP RP
-    {
+    {   
         scope=1;
         activeFuncPtr = new funcEntry;
         activeFuncPtr->name = string("main");
@@ -131,10 +130,9 @@ MAIN_HEAD: INT MAIN LP RP
 
 FUNC_DEF: FUNC_HEAD LCB BODY RCB
     {
-        // Function(activeFuncPtr);
-        deleteVarList(activeFuncPtr, scope);
-        activeFuncPtr=NULL;
-        scope=0;
+        deleteVarList(activeFuncPtr, scope);   
+        activeFuncPtr = NULL;
+        scope = 0;
         string s = "function end";
         gen(functionInstruction, s, nextquad);
     }
@@ -142,27 +140,30 @@ FUNC_DEF: FUNC_HEAD LCB BODY RCB
 
 FUNC_HEAD: RES_ID LP DECL_PLIST RP
     {
-        activeFuncPtr->numOfParam = typeRecordList.size();
-        activeFuncPtr->parameterList = typeRecordList;
-        activeFuncPtr->functionOffset = 0;
-        typeRecordList.clear();
-        searchFunc(activeFuncPtr, funcEntryRecord, found);
-        if(found){
-            cout << "Function already declared: " <<activeFuncPtr->name << endl;
-            delete activeFuncPtr;
-            activeFuncPtr=NULL;
-        }   
-        else{
-            addFunction(activeFuncPtr, funcEntryRecord);
-            scope = 2; 
-            string s = "function begin _" + activeFuncPtr->name;
-            gen(functionInstruction, s, nextquad);
+        if (activeFuncPtr != NULL) {
+            activeFuncPtr->numOfParam = typeRecordList.size();
+            activeFuncPtr->parameterList = typeRecordList;
+            activeFuncPtr->functionOffset = 0;
+            typeRecordList.clear();
+            searchFunc(activeFuncPtr, funcEntryRecord, found);
+            if(found){
+                cout << "Function already declared: " <<activeFuncPtr->name << endl;
+                errorFound = true;
+                delete activeFuncPtr;
+                activeFuncPtr=NULL;
+            }   
+            else{
+                addFunction(activeFuncPtr, funcEntryRecord);
+                scope = 2; 
+                string s = "function begin _" + activeFuncPtr->name;
+                gen(functionInstruction, s, nextquad);
+            }
         }
     }
 ;
 
 RES_ID: RESULT ID       
-    {
+    {   
         scope=1;
         activeFuncPtr = new funcEntry;
         activeFuncPtr->name = string($2);
@@ -184,7 +185,7 @@ DECL_PL: DECL_PL COMMA DECL_PARAM
         typeRecord* pn = NULL;
         searchParam(varRecord->name, typeRecordList, found, pn);
         if(found){
-            cout<<"Redeclaration of parameter"<<(varRecord->name)<<endl;
+            cout<<"Redeclaration of parameter "<<(varRecord->name)<<endl;
         } else {
             // cout<<"\nVar Name:"<<varRecord->name<<endl;
             typeRecordList.push_back(varRecord);
@@ -233,17 +234,17 @@ BODY: STMT_LIST
 ;
 
 STMT_LIST: STMT_LIST STMT 
-        {
-            $$.nextList = new vector<int>;
-            merge($$.nextList, $1.nextList);
-            merge($$.nextList, $2.nextList);
-            $$.breakList = new vector<int>;
-            merge($$.breakList, $1.breakList);
-            merge($$.breakList, $2.breakList);
-            $$.continueList = new vector<int>;
-            merge($$.continueList, $1.continueList);
-            merge($$.continueList, $2.continueList);
-        }
+    {
+        $$.nextList = new vector<int>;
+        merge($$.nextList, $1.nextList);
+        merge($$.nextList, $2.nextList);
+        $$.breakList = new vector<int>;
+        merge($$.breakList, $1.breakList);
+        merge($$.breakList, $2.breakList);
+        $$.continueList = new vector<int>;
+        merge($$.continueList, $1.continueList);
+        merge($$.continueList, $2.continueList);
+    }
     | STMT 
     {
         $$.nextList = new vector<int>;
@@ -255,11 +256,12 @@ STMT_LIST: STMT_LIST STMT
     }
 ;
 
-STMT: VAR_DECL{
+STMT: VAR_DECL
+    {
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
-}
+    }
     | ASG SEMI
     {
         $$.nextList = new vector<int>;
@@ -315,25 +317,27 @@ STMT: VAR_DECL{
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
-        if ($2.type != ERRORTYPE) {
-            if (activeFuncPtr->returnType == NULLVOID && $2.type != NULLVOID) {
-                cout<<"The function "<< activeFuncPtr->name<<" has void return type"<<endl;
-            }
-            else if (activeFuncPtr->returnType != NULLVOID && $2.type == NULLVOID) {
-                cout<<"The function "<< activeFuncPtr->name<<" must have a"<<" return type"<<endl;
-            }
-            else {
-                string s;
-                if ($2.type != NULLVOID) {
-                    s = "return " + (*($2.registerName));
-                    tempSet.freeRegister(*($2.registerName));
+        // if(activeFuncPtr!=NULL){
+            if ($2.type != ERRORTYPE && activeFuncPtr != NULL) {
+                if (activeFuncPtr->returnType == NULLVOID && $2.type != NULLVOID) {
+                    cout<<"The function "<< activeFuncPtr->name<<" has void return type"<<endl;
+                }
+                else if (activeFuncPtr->returnType != NULLVOID && $2.type == NULLVOID) {
+                    cout<<"The function "<< activeFuncPtr->name<<" must have a"<<" return type"<<endl;
                 }
                 else {
-                    s = "return";
+                    string s;
+                    if ($2.type != NULLVOID) {
+                        s = "return " + (*($2.registerName));
+                        tempSet.freeRegister(*($2.registerName));
+                    }
+                    else {
+                        s = "return";
+                    }
+                    gen(functionInstruction, s, nextquad);
                 }
-                gen(functionInstruction, s, nextquad);
             }
-        }   
+        // }   
     }
     | READ ID_ARR SEMI
     {
@@ -351,8 +355,9 @@ STMT: VAR_DECL{
             else {
                 registerName = tempSet.getFloatRegister();
             }
-            string s = registerName + " = " + (*($2.registerName)) ;
-            gen(functionInstruction, s, nextquad);
+            string s;
+            // string s = registerName + " = " + (*($2.registerName)) ;
+            // gen(functionInstruction, s, nextquad);
             s = "read " + registerName;
             gen(functionInstruction, s, nextquad);
             s = (*($2.registerName)) + " = " +  registerName;
@@ -384,7 +389,16 @@ STMT: VAR_DECL{
             tempSet.freeRegister(registerName);
             if ($2.offsetRegName != NULL) tempSet.freeRegister(*($2.offsetRegName));
         }
-    }   
+    }
+    | error SEMI
+    {
+        errorFound = 1;
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+        printf("Error: syntax error in line number %d\n",yylineno-1);
+        printf("==================STMT============\n");
+    }
 ;
 
 VAR_DECL: D SEMI 
@@ -412,39 +426,52 @@ DEC_ID_ARR: ID
         int found = 0;
         typeRecord* vn = NULL;
         // cout << "Scope : "<<scope<<endl;
-        searchVariable(string($1), activeFuncPtr, found, vn, scope);
-        if (found) {
-            if(vn->isValid==true){
-                printf("Variable %s already declared at same level %d\n", $1, scope);
-            }
-            else{
-                if(vn->eleType == resultType){
-                    vn->isValid=true;
-                    vn->maxDimlistOffset = max(vn->maxDimlistOffset,1);
-                    vn->type=SIMPLE;
+        if(activeFuncPtr!=NULL){
+            searchVariable(string($1), activeFuncPtr, found, vn, scope);
+            if (found) {
+                if(vn->isValid==true){
+                    printf("Variable %s already declared at same level %d\n", $1, scope);
                 }
+                else{
+                    if(vn->eleType == resultType){
+                        vn->isValid=true;
+                        vn->maxDimlistOffset = max(vn->maxDimlistOffset,1);
+                        vn->type=SIMPLE;
+                    }
+                    else {
+                        varRecord = new typeRecord;
+                        varRecord->name = string($1);
+                        varRecord->type = SIMPLE;
+                        varRecord->tag = VARIABLE;
+                        varRecord->scope = scope;
+                        varRecord->isValid=true;
+                        varRecord->maxDimlistOffset=1;
+                        typeRecordList.push_back(varRecord);
+                    }
+                }
+            }
+            else if (scope == 2) {
+                typeRecord* pn = NULL;
+                searchParam(string($1), activeFuncPtr->parameterList, found , pn);
+                if (found) {
+                    printf("Parameter with name %s exists %d\n", $1, scope);
+                } 
                 else {
                     varRecord = new typeRecord;
                     varRecord->name = string($1);
+                    // printf("var $1:%s\n", $1);
                     varRecord->type = SIMPLE;
                     varRecord->tag = VARIABLE;
                     varRecord->scope = scope;
                     varRecord->isValid=true;
                     varRecord->maxDimlistOffset=1;
+                    // cout<<"variable name: "<<varRecord->name<<endl;
                     typeRecordList.push_back(varRecord);
                 }
             }
-        }
-        else if (scope == 2) {
-            typeRecord* pn = NULL;
-            searchParam(string($1), activeFuncPtr->parameterList, found , pn);
-            if (found) {
-                printf("Parameter with name %s exists %d\n", $1, scope);
-            } 
             else {
                 varRecord = new typeRecord;
                 varRecord->name = string($1);
-                // printf("var $1:%s\n", $1);
                 varRecord->type = SIMPLE;
                 varRecord->tag = VARIABLE;
                 varRecord->scope = scope;
@@ -453,60 +480,66 @@ DEC_ID_ARR: ID
                 // cout<<"variable name: "<<varRecord->name<<endl;
                 typeRecordList.push_back(varRecord);
             }
+        } else {
+            errorFound = true;
         }
-        else {
-            varRecord = new typeRecord;
-            varRecord->name = string($1);
-            varRecord->type = SIMPLE;
-            varRecord->tag = VARIABLE;
-            varRecord->scope = scope;
-            varRecord->isValid=true;
-            varRecord->maxDimlistOffset=1;
-            // cout<<"variable name: "<<varRecord->name<<endl;
-            typeRecordList.push_back(varRecord);
-        }
+        
     }
     | ID ASSIGN ASG
     {
         int found = 0;
         typeRecord* vn = NULL;
         // cout << "Scope : "<<scope<<endl;
-        searchVariable(string($1), activeFuncPtr, found, vn, scope);
-        bool varCreated = false;;
-        if (found) {
-            if(vn->isValid==true){
-                printf("Variable %s already declared at same level %d\n", $1, scope);
-            }
-            else{
-                if(vn->eleType == resultType){
-                    vn->isValid=true;
-                    vn->maxDimlistOffset = max(vn->maxDimlistOffset,1);
-                    vn->type=SIMPLE;
-                    varCreated = true;
+        if(activeFuncPtr!=NULL){
+            searchVariable(string($1), activeFuncPtr, found, vn, scope);
+            bool varCreated = false;;
+            if (found) {
+                if(vn->isValid==true){
+                    printf("Variable %s already declared at same level %d\n", $1, scope);
                 }
+                else{
+                    if(vn->eleType == resultType){
+                        vn->isValid=true;
+                        vn->maxDimlistOffset = max(vn->maxDimlistOffset,1);
+                        vn->type=SIMPLE;
+                        varCreated = true;
+                    }
+                    else {
+                        varRecord = new typeRecord;
+                        varRecord->name = string($1);
+                        varRecord->type = SIMPLE;
+                        varRecord->tag = VARIABLE;
+                        varRecord->scope = scope;
+                        varRecord->isValid=true;
+                        varRecord->maxDimlistOffset=1;
+                        typeRecordList.push_back(varRecord);
+                        varCreated = true;
+                    }
+                }
+            }
+            else if (scope == 2) {
+                typeRecord* pn = NULL;
+                searchParam(string($1), activeFuncPtr->parameterList, found , pn);
+                if (found) {
+                    printf("Parameter with name %s exists %d\n", $1, scope);
+                } 
                 else {
                     varRecord = new typeRecord;
                     varRecord->name = string($1);
+                    // printf("var $1:%s\n", $1);
                     varRecord->type = SIMPLE;
                     varRecord->tag = VARIABLE;
                     varRecord->scope = scope;
-                    varRecord->isValid=true;
                     varRecord->maxDimlistOffset=1;
+                    varRecord->isValid=true;
+                    // cout<<"variable name: "<<varRecord->name<<endl;
                     typeRecordList.push_back(varRecord);
                     varCreated = true;
                 }
             }
-        }
-        else if (scope == 2) {
-            typeRecord* pn = NULL;
-            searchParam(string($1), activeFuncPtr->parameterList, found , pn);
-            if (found) {
-                printf("Parameter with name %s exists %d\n", $1, scope);
-            } 
             else {
                 varRecord = new typeRecord;
                 varRecord->name = string($1);
-                // printf("var $1:%s\n", $1);
                 varRecord->type = SIMPLE;
                 varRecord->tag = VARIABLE;
                 varRecord->scope = scope;
@@ -516,76 +549,90 @@ DEC_ID_ARR: ID
                 typeRecordList.push_back(varRecord);
                 varCreated = true;
             }
-        }
-        else {
-            varRecord = new typeRecord;
-            varRecord->name = string($1);
-            varRecord->type = SIMPLE;
-            varRecord->tag = VARIABLE;
-            varRecord->scope = scope;
-            varRecord->maxDimlistOffset=1;
-            varRecord->isValid=true;
-            // cout<<"variable name: "<<varRecord->name<<endl;
-            typeRecordList.push_back(varRecord);
-            varCreated = true;
-        }
-        if(varCreated){
-            if ($3.type == ERRORTYPE) {
-                errorFound = true;
-            }
-            else if ($3.type == NULLVOID) {
-                cout << "Cannot assign void to non-void type " << string($1) << endl;
-                errorFound = true;
-            }
-            else {
-                string registerName;
-                if (resultType == INTEGER && $3.type == FLOATING) {
-                    registerName = tempSet.getRegister();
-                    string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
-                    gen(functionInstruction, s, nextquad);
-                    tempSet.freeRegister(*($3.registerName));
+            if(varCreated){
+                if ($3.type == ERRORTYPE) {
+                    errorFound = true;
                 }
-                else if(resultType == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
-                    registerName = tempSet.getFloatRegister();
-                    string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
-                    gen(functionInstruction, s, nextquad); 
-                    tempSet.freeRegister(*($3.registerName));
+                else if ($3.type == NULLVOID) {
+                    cout << "Cannot assign void to non-void type " << string($1) << endl;
+                    errorFound = true;
                 }
                 else {
-                    registerName = *($3.registerName);
-                }
-                string dataType = eletypeMapper(resultType);
-                dataType += "_" + to_string(scope);
-                string s =  "_" + string($1) + "_" + dataType + " = " + registerName ;
-                gen(functionInstruction, s, nextquad);
-                tempSet.freeRegister(registerName);
-            }   
+                    string registerName;
+                    if (resultType == INTEGER && $3.type == FLOATING) {
+                        registerName = tempSet.getRegister();
+                        string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
+                        gen(functionInstruction, s, nextquad);
+                        tempSet.freeRegister(*($3.registerName));
+                    }
+                    else if(resultType == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
+                        registerName = tempSet.getFloatRegister();
+                        string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
+                        gen(functionInstruction, s, nextquad); 
+                        tempSet.freeRegister(*($3.registerName));
+                    }
+                    else {
+                        registerName = *($3.registerName);
+                    }
+                    string dataType = eletypeMapper(resultType);
+                    dataType += "_" + to_string(scope);
+                    string s =  "_" + string($1) + "_" + dataType + " = " + registerName ;
+                    gen(functionInstruction, s, nextquad);
+                    tempSet.freeRegister(registerName);
+                }   
+            }
+        } else {
+            errorFound = true;
         }
-
     }
     | ID DEC_BR_DIMLIST
     {  
-        int found = 0;
-        typeRecord* vn = NULL;
-        searchVariable(string($1), activeFuncPtr, found, vn,scope); 
-        if (found) {
-            if(vn->isValid==true){
-                printf("Variable %s already declared at same level %d\n", $1, scope);
-            }
-            else{
-                if(vn->eleType == resultType){
-                    vn->isValid=true;
-                    int a=1;
-                    for(auto it : decdimlist){
-                        a*=(it);
-                    }
-                    vn->maxDimlistOffset = max(vn->maxDimlistOffset,a);
-                    if(vn->type==ARRAY){
-                        vn->dimlist.clear();           
-                    }
-                    vn->type=ARRAY;
-                    vn->dimlist = decdimlist;
+        if (activeFuncPtr != NULL) {
+            int found = 0;
+            typeRecord* vn = NULL;
+            searchVariable(string($1), activeFuncPtr, found, vn,scope); 
+            if (found) {
+                if(vn->isValid==true){
+                    printf("Variable %s already declared at same level %d\n", $1, scope);
                 }
+                else{
+                    if(vn->eleType == resultType){
+                        vn->isValid=true;
+                        int a=1;
+                        for(auto it : decdimlist){
+                            a*=(it);
+                        }
+                        vn->maxDimlistOffset = max(vn->maxDimlistOffset,a);
+                        if(vn->type==ARRAY){
+                            vn->dimlist.clear();           
+                        }
+                        vn->type=ARRAY;
+                        vn->dimlist = decdimlist;
+                    }
+                    else {
+                        varRecord = new typeRecord;
+                        varRecord->name = string($1);
+                        varRecord->type = ARRAY;
+                        varRecord->tag = VARIABLE;
+                        varRecord->scope = scope;
+                        varRecord->dimlist = decdimlist;
+                        varRecord->isValid=true;
+                        int a=1;
+                        for(auto it : decdimlist){
+                            a*=(it);
+                        }
+                        varRecord->maxDimlistOffset = a;
+                        // cout<<"variable name: "<<varRecord->name<<endl;
+                        typeRecordList.push_back(varRecord);
+                    }
+                }
+            }
+            else if (scope == 2) {
+                typeRecord* pn = NULL;
+                searchParam(string($1), activeFuncPtr->parameterList, found, pn);
+                if (found) {
+                    printf("Parameter with name %s exists %d\n", $1, scope);
+                } 
                 else {
                     varRecord = new typeRecord;
                     varRecord->name = string($1);
@@ -603,15 +650,8 @@ DEC_ID_ARR: ID
                     typeRecordList.push_back(varRecord);
                 }
             }
-        }
-        else if (scope == 2) {
-            typeRecord* pn = NULL;
-            searchParam(string($1), activeFuncPtr->parameterList, found, pn);
-            if (found) {
-                printf("Parameter with name %s exists %d\n", $1, scope);
-            } 
-            else {
-                varRecord = new typeRecord;
+            else{
+                varRecord = new typeRecord;        
                 varRecord->name = string($1);
                 varRecord->type = ARRAY;
                 varRecord->tag = VARIABLE;
@@ -623,27 +663,11 @@ DEC_ID_ARR: ID
                     a*=(it);
                 }
                 varRecord->maxDimlistOffset = a;
-                // cout<<"variable name: "<<varRecord->name<<endl;
                 typeRecordList.push_back(varRecord);
             }
-        }
-        else{
-            varRecord = new typeRecord;        
-            varRecord->name = string($1);
-            varRecord->type = ARRAY;
-            varRecord->tag = VARIABLE;
-            varRecord->scope = scope;
-            varRecord->dimlist = decdimlist;
-            varRecord->isValid=true;
-            int a=1;
-            for(auto it : decdimlist){
-                a*=(it);
-            }
-            varRecord->maxDimlistOffset = a;
-            typeRecordList.push_back(varRecord);
-        }
-        decdimlist.clear();  
-    } 
+            decdimlist.clear();  
+        }    
+    }
 ;
 
 DEC_BR_DIMLIST: LSB NUMINT RSB
@@ -694,7 +718,7 @@ FUNC_CALL: ID LP PARAMLIST RP
 ;
 
 PARAMLIST: PLIST
-    | %empty 
+    | {paramListStack.push(typeRecordList); typeRecordList.clear();} %empty 
 ;
 
 PLIST: PLIST COMMA ASG
@@ -1169,26 +1193,29 @@ CASELIST:
     }
 ;
 
-M3: %empty { 
+M3: %empty
+    { 
         $$ = nextquad;
         gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad); 
     }
 ;
 
-N3: %empty { 
-    $$.begin = nextquad; 
-    $$.falseList = new vector<int>;
-    $$.falseList->push_back(nextquad);
-    gen(functionInstruction, "goto L", nextquad);
+N3: %empty
+    { 
+        $$.begin = nextquad; 
+        $$.falseList = new vector<int>;
+        $$.falseList->push_back(nextquad);
+        gen(functionInstruction, "goto L", nextquad);
     }
 ;
 
-P3: %empty { 
-    $$.falseList = new vector<int>;
-    $$.falseList->push_back(nextquad);
-    gen(functionInstruction, "goto L", nextquad);
-    $$.begin = nextquad; 
-    gen(functionInstruction, "L"+to_string(nextquad)+":", nextquad);
+P3: %empty 
+    { 
+        $$.falseList = new vector<int>;
+        $$.falseList->push_back(nextquad);
+        gen(functionInstruction, "goto L", nextquad);
+        $$.begin = nextquad; 
+        gen(functionInstruction, "L"+to_string(nextquad)+":", nextquad);
     }
 ;
 
@@ -1236,13 +1263,20 @@ FOREXP: FOR LP ASG1 SEMI M3 ASG1 Q3 {
         if($3.type!=NULLVOID){
             tempSet.freeRegister(*($3.registerName));
         }
-        tempSet.freeRegister(*($3.registerName));
+        // tempSet.freeRegister(*($3.registerName));
         if($6.type!=NULLVOID){
             tempSet.freeRegister(*($6.registerName));
         }
         if($11.type!=NULLVOID){
             tempSet.freeRegister(*($11.registerName));
         }
+    }
+    | FOR error RP
+    {
+        errorFound = 1;
+        $$.falseList = new vector<int>;
+        printf("Error: syntax error in line number %d\n", yylineno-1);
+        printf("=================FOR=============\n");
     }
 ;
 
@@ -1332,6 +1366,13 @@ IFEXP: IF LP ASG RP
             tempSet.freeRegister(*($3.registerName));
         } 
     }
+    | IF error RP
+    {
+        errorFound = 1;
+        $$.falseList = new vector <int>;
+        printf("Error: syntax error in line number %d\n", yylineno-1);
+        printf("==================IF ERROR=============\n");
+    }
 ;
 
 WHILESTMT:  WHILEEXP LCB BODY RCB 
@@ -1363,6 +1404,12 @@ WHILEEXP: WHILE M1 LP ASG RP
             gen(functionInstruction, "if " + *($4.registerName) + "== 0 goto L", nextquad);
             $$.begin = $2; 
         }
+    }
+    | WHILE error RP
+    {   
+        $$.falseList = new vector<int>;
+        printf("Error: syntax error in line number %d\n", yylineno-1);
+        printf("===============WHILE===============\n");
     }
 ;
 
@@ -1734,7 +1781,7 @@ TERM: TERM MUL FACTOR
     | TERM DIV FACTOR  
     {
         if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
-          $$.type = ERRORTYPE;  
+        $$.type = ERRORTYPE;  
         }
         else {
             if (arithmeticCompatible($1.type, $3.type)) {
@@ -1774,7 +1821,7 @@ TERM: TERM MUL FACTOR
     | TERM MOD FACTOR
     {
         if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
-          $$.type = ERRORTYPE;  
+        $$.type = ERRORTYPE;  
         }
         else {
             if ($1.type == INTEGER && $3.type == INTEGER) {
@@ -1834,6 +1881,7 @@ FACTOR: ID_ARR
         $$.registerName = new string(tempSet.getRegister());
         string s = (*($$.registerName)) + " = -" + string($2) ;
         gen(functionInstruction, s, nextquad);  
+        
     }
     | NUMINT    
     { 
@@ -1847,7 +1895,7 @@ FACTOR: ID_ARR
         $$.type = FLOATING;
         $$.registerName = new string(tempSet.getFloatRegister());
         string s = (*($$.registerName)) + " = " + string($2) ;
-        gen(functionInstruction, s, nextquad);     
+        gen(functionInstruction, s, nextquad);  
     }
     | NUMFLOAT  
     { 
@@ -2114,7 +2162,7 @@ BR_DIMLIST: LSB ASG RSB
         }
         else {
             cout << "One of the dimension of an array cannot be evaluated to integer" << endl;
-        }    
+        }  
     }
 ;
 
@@ -2122,8 +2170,8 @@ BR_DIMLIST: LSB ASG RSB
 
 void yyerror(char *s)
 {      
-    printf( "\nSyntax error %s at line %d\n", s, yylineno);
-    fflush(stdout);
+    // printf( "\nSyntax error %s at line %d\n", s, yylineno);
+    // fflush(stdout);
 }
 
 int main(int argc, char **argv)
@@ -2136,17 +2184,11 @@ int main(int argc, char **argv)
     switchVar.clear();
     dimlist.clear();
     
-    if( remove( "tempInter.txt" ) != 0 )
-    {
-    }
     yyparse();
-    if( remove( "./output/intermediate.txt" ) != 0 )
-    {
-    }
     populateOffsets(funcEntryRecord);
     ofstream outinter;
     outinter.open("./output/intermediate.txt");
-    if(1){
+    if(!errorFound){
         for(auto it:functionInstruction){
             outinter<<it<<endl;
         }

@@ -28,36 +28,27 @@ string registerSet::getFloatRegister() {
 
 
 void registerSet::freeRegister(string s){
-    ofstream tempfile;
     if(s[0]=='F'){
         s[0] = '0';
         int x = stoi(s);
         for(auto it : floatRegister){
             if(it==x){
-                tempfile.open("tempInter.txt", ios::app);
                 cout<<"Float Register already free"<<s<<endl;
-                tempfile.close();
                 return;
             }
         }
-        tempfile.open("tempInter.txt", ios::app);
         cout<<"FLoat Register Freed "<< s <<endl;
-        tempfile.close();
         floatRegister.push_back(x);
     } else if(s[0] == 'T'){
         s[0] = '0';
         int x = stoi(s);
         for(auto it:tempRegister){
             if(it==x){
-                tempfile.open("tempInter.txt", ios::app);
                 cout<<"Int Register already free"<<s<<endl;
-                tempfile.close();
                 return;
             }
         }
-        tempfile.open("tempInter.txt", ios::app);
         cout<<"Int Register Freed "<< s <<endl;
-        tempfile.close();
         tempRegister.push_back(x);
     } else {
         cout << "Not a Temp Variable : " << s << endl;
@@ -67,11 +58,7 @@ void registerSet::freeRegister(string s){
 void gen(vector<string> &functionInstruction, string instruction, int &nextQuad){
     functionInstruction.push_back(instruction);
     nextQuad++;
-    ofstream tempfile;
-    tempfile.open("tempInter.txt", ios::app);
     cout<<instruction<<endl;
-    tempfile.close();
-    // cout<<instruction<<endl;
     return;
 }
 

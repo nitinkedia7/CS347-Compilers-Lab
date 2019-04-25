@@ -8,7 +8,8 @@ int fib(int n) {
 int main() {
    int f;
    int n;
-   n = 10;
+   read n;
    f = fib(n);
+   print f;
    return 0;
 }

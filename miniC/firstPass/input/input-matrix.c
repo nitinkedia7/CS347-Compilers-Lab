@@ -1,5 +1,6 @@
 int main() {
-    int A[5][5], B[5][5], s;
+    float A[5][5], B[5][5], s;
+    s = 0;
     {
         int i;
         for (i = 0; i < 5; i++) {
@@ -9,6 +10,10 @@ int main() {
                     A[i][j] = i+j;
                     B[i][j] = i+j;
                 }
+                else {
+                    A[i][j] = 0;
+                    B[i][j] = 0;
+                }
             }
         }
     }
@@ -17,7 +22,6 @@ int main() {
         for (i = 0; i < 5; i++) {
             int j;
             for (j = 0; j < 5; j++) {
-                s = 0;
                 int k;
                 for (k = 0; k < 5; k++) {
                     s = s + A[i][k] * B[k][j];

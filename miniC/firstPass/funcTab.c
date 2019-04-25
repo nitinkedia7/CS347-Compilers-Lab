@@ -9,17 +9,27 @@ void patchDataType(eletype eleType, vector<typeRecord*> &typeRecordList, int sco
 }
 
 void insertSymTab(vector<typeRecord*> &typeRecordList, funcEntry* activeFuncPtr) {
+    if (activeFuncPtr == NULL) {
+        return;
+    }
     activeFuncPtr->variableList.insert(activeFuncPtr->variableList.end(), typeRecordList.begin(), typeRecordList.end());
     return;
 }
 
 void insertParamTab(vector<typeRecord*> &typeRecordList, funcEntry* activeFuncPtr) {
+    if(activeFuncPtr == NULL) {
+        return;
+    }
     activeFuncPtr->parameterList.insert(activeFuncPtr->parameterList.end(), typeRecordList.begin(), typeRecordList.end());
     activeFuncPtr->numOfParam+=typeRecordList.size();
 }
 
 void deleteVarList(funcEntry* activeFuncPtr, int scope){
+    if(activeFuncPtr == NULL) {
+        return;
+    }
     vector <typeRecord*> variableList;
+
     for(auto it:activeFuncPtr->variableList){
         if(it->scope==scope){
             it->isValid = false;
@@ -33,7 +43,10 @@ void deleteVarList(funcEntry* activeFuncPtr, int scope){
     // activeFuncPtr->variableList.swap(variableList);
 }
 
-void searchVariable(string name, funcEntry* activeFuncPtr, int &found, typeRecord *&vn, int scope) {
+void searchVariable(string name, funcEntry* activeFuncPtr, int &found, typeRecord *&vn, int scope) {   
+    if(activeFuncPtr == NULL) {
+        return;
+    }
     vector<typeRecord*>::reverse_iterator i;
     bool flag=false;
     for (i = activeFuncPtr->variableList.rbegin(); i != activeFuncPtr->variableList.rend(); ++i) {
@@ -54,6 +67,9 @@ void searchVariable(string name, funcEntry* activeFuncPtr, int &found, typeRecor
 }
 
 void searchCallVariable(string name, funcEntry* activeFuncPtr, int &found, typeRecord *&vn) {
+    if(activeFuncPtr == NULL) {
+        return;
+    }
     vector<typeRecord*>::reverse_iterator i;
     bool flag=false;
     int sc=0;
@@ -77,8 +93,6 @@ void searchCallVariable(string name, funcEntry* activeFuncPtr, int &found, typeR
     return;
 }
 
-// void insertVariable(string)
-
 void searchParam(string name, vector<typeRecord*> &parameterList, int &found, typeRecord *&pn) {
     vector<typeRecord*> :: reverse_iterator i;
     for (i = parameterList.rbegin(); i != parameterList.rend(); ++i){
@@ -94,24 +108,14 @@ void searchParam(string name, vector<typeRecord*> &parameterList, int &found, ty
 }
 
 void searchFunc(funcEntry* activeFuncPtr, vector<funcEntry*> &funcEntryRecord, int &found){
-    for(auto it:funcEntryRecord){
-        if(it->name == activeFuncPtr->name && it->returnType == activeFuncPtr->returnType && it->numOfParam == activeFuncPtr->numOfParam){
-            int flag=1;
-            for(int i=0;i<it->numOfParam;i++){
-                if((it->parameterList[i])->eleType != activeFuncPtr->parameterList[i]->eleType){
-                    found=-1;
-                    flag=0;
-                    break;
-                }
-            }
-            if(flag == 1){
-                found=1;
-                return;
-            } 
+    for (auto it : funcEntryRecord) {
+        if(it->name == activeFuncPtr->name) {
+            found = 1;
+            return;
         }
-    }
-    if (found != -1) found=0;
-    return;    
+    }  
+    found = 0;
+    return;  
 }
 
 void compareFunc(funcEntry* &activeFuncPtr, vector<funcEntry*> &funcEntryRecord, int &found){

@@ -311,6 +311,13 @@ FLOATASG: USERVAR ASSIGN REGFLOAT
         int offset = getOffset(functionList, activeFunc, string($3), 0)+paramOffset;
         fprintf(mips, "l.s $f%s, %d($sp)\n", $1+1, offset);
     }
+    | REGFLOAT ASSIGN USERVAR LSB REGINT RSB
+    {
+        int offset = getOffset(functionList, activeFunc, string($3), 0)+paramOffset;
+        fprintf(mips, "mul $t%s, $t%s, %d\n", $5+1, $5+1, INTSIZE);
+        fprintf(mips, "subu $s0, $sp, $t%s\n", $5+1);
+        fprintf(mips, "l.s $f%s, %d($s0)\n", $1+1, offset);
+    }
     | REGFLOAT ASSIGN CONVERTFLOAT LP REGINT RP
     {
         // convert from integer to float
