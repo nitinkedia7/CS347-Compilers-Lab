@@ -224,7 +224,12 @@ BODY: STMT_LIST
         $$.continueList = new vector<int>;
         merge($$.continueList, $1.continueList);
     }
-    | %empty
+    | %empty 
+    {
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector<int>;
+    }
 ;
 
 STMT_LIST: STMT_LIST STMT 
@@ -467,6 +472,7 @@ DEC_ID_ARR: ID
         typeRecord* vn = NULL;
         // cout << "Scope : "<<scope<<endl;
         searchVariable(string($1), activeFuncPtr, found, vn, scope);
+        bool varCreated = false;;
         if (found) {
             if(vn->isValid==true){
                 printf("Variable %s already declared at same level %d\n", $1, scope);
@@ -476,6 +482,7 @@ DEC_ID_ARR: ID
                     vn->isValid=true;
                     vn->maxDimlistOffset = max(vn->maxDimlistOffset,1);
                     vn->type=SIMPLE;
+                    varCreated = true;
                 }
                 else {
                     varRecord = new typeRecord;
@@ -486,6 +493,7 @@ DEC_ID_ARR: ID
                     varRecord->isValid=true;
                     varRecord->maxDimlistOffset=1;
                     typeRecordList.push_back(varRecord);
+                    varCreated = true;
                 }
             }
         }
@@ -506,6 +514,7 @@ DEC_ID_ARR: ID
                 varRecord->isValid=true;
                 // cout<<"variable name: "<<varRecord->name<<endl;
                 typeRecordList.push_back(varRecord);
+                varCreated = true;
             }
         }
         else {
@@ -518,7 +527,41 @@ DEC_ID_ARR: ID
             varRecord->isValid=true;
             // cout<<"variable name: "<<varRecord->name<<endl;
             typeRecordList.push_back(varRecord);
+            varCreated = true;
         }
+        if(varCreated){
+            if ($3.type == ERRORTYPE) {
+                errorFound = true;
+            }
+            else if ($3.type == NULLVOID) {
+                cout << "Cannot assign void to non-void type " << string($1) << endl;
+                errorFound = true;
+            }
+            else {
+                string registerName;
+                if (resultType == INTEGER && $3.type == FLOATING) {
+                    registerName = tempSet.getRegister();
+                    string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
+                    gen(functionInstruction, s, nextquad);
+                    tempSet.freeRegister(*($3.registerName));
+                }
+                else if(resultType == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
+                    registerName = tempSet.getFloatRegister();
+                    string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
+                    gen(functionInstruction, s, nextquad); 
+                    tempSet.freeRegister(*($3.registerName));
+                }
+                else {
+                    registerName = *($3.registerName);
+                }
+                string dataType = eletypeMapper(resultType);
+                dataType += "_" + to_string(scope);
+                string s =  "_" + string($1) + "_" + dataType + " = " + registerName ;
+                gen(functionInstruction, s, nextquad);
+                tempSet.freeRegister(registerName);
+            }   
+        }
+
     }
     | ID DEC_BR_DIMLIST
     {  
@@ -743,10 +786,250 @@ ASG: CONDITION1
         }
     }
     | LHS PLUSASG ASG
+    {
+        if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
+            $$.type = ERRORTYPE;
+            errorFound = true;
+        }
+        else if ($3.type == NULLVOID) {
+            cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
+            $$.type = ERRORTYPE;
+            errorFound = true;
+        }
+        else {
+            $$.type = $1.type;
+            string registerName;
+            if ($1.type == INTEGER && $3.type == FLOATING) {
+                registerName = tempSet.getRegister();
+                string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
+                gen(functionInstruction, s, nextquad);
+                tempSet.freeRegister(*($3.registerName));
+            }
+            else if($1.type == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
+                registerName = tempSet.getFloatRegister();
+                string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
+                gen(functionInstruction, s, nextquad); 
+                tempSet.freeRegister(*($3.registerName));
+            }
+            else {
+                registerName = *($3.registerName);
+            }
+            string s, tempReg;
+            if($1.type == INTEGER){
+                tempReg = tempSet.getRegister();
+                s = tempReg + " = " + (*($1.registerName));
+                gen(functionInstruction, s, nextquad);
+            }
+            else{
+                tempReg = tempSet.getFloatRegister();
+                s = tempReg + " = " + (*($1.registerName));   
+                gen(functionInstruction, s, nextquad);
+            }
+            s = registerName + " = " + registerName + " + " + tempReg;
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(tempReg);
+            s = (*($1.registerName)) + " = " + registerName ;
+            gen(functionInstruction, s, nextquad);
+            $$.registerName = new string(registerName);
+            if ($1.offsetRegName != NULL) tempSet.freeRegister(*($1.offsetRegName));
+        }
+    }
     | LHS MINASG ASG
+    {
+        if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
+            $$.type = ERRORTYPE;
+            errorFound = true;
+        }
+        else if ($3.type == NULLVOID) {
+            cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
+            $$.type = ERRORTYPE;
+            errorFound = true;
+        }
+        else {
+            $$.type = $1.type;
+            string registerName;
+            if ($1.type == INTEGER && $3.type == FLOATING) {
+                registerName = tempSet.getRegister();
+                string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
+                gen(functionInstruction, s, nextquad);
+                tempSet.freeRegister(*($3.registerName));
+            }
+            else if($1.type == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
+                registerName = tempSet.getFloatRegister();
+                string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
+                gen(functionInstruction, s, nextquad); 
+                tempSet.freeRegister(*($3.registerName));
+            }
+            else {
+                registerName = *($3.registerName);
+            }
+            string s, tempReg;
+            if($1.type == INTEGER){
+                tempReg = tempSet.getRegister();
+                s = tempReg + " = " + (*($1.registerName));
+                gen(functionInstruction, s, nextquad);
+            }
+            else{
+                tempReg = tempSet.getFloatRegister();
+                s = tempReg + " = " + (*($1.registerName));   
+                gen(functionInstruction, s, nextquad);
+            }
+            s = registerName + " = " + registerName + " - " + tempReg;
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(tempReg);
+            s = (*($1.registerName)) + " = " + registerName ;
+            gen(functionInstruction, s, nextquad);
+            $$.registerName = new string(registerName);
+            if ($1.offsetRegName != NULL) tempSet.freeRegister(*($1.offsetRegName));
+        }
+    }
     | LHS MULASG ASG
+    {
+        if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
+            $$.type = ERRORTYPE;
+            errorFound = true;
+        }
+        else if ($3.type == NULLVOID) {
+            cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
+            $$.type = ERRORTYPE;
+            errorFound = true;
+        }
+        else {
+            $$.type = $1.type;
+            string registerName;
+            if ($1.type == INTEGER && $3.type == FLOATING) {
+                registerName = tempSet.getRegister();
+                string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
+                gen(functionInstruction, s, nextquad);
+                tempSet.freeRegister(*($3.registerName));
+            }
+            else if($1.type == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
+                registerName = tempSet.getFloatRegister();
+                string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
+                gen(functionInstruction, s, nextquad); 
+                tempSet.freeRegister(*($3.registerName));
+            }
+            else {
+                registerName = *($3.registerName);
+            }
+            string s, tempReg;
+            if($1.type == INTEGER){
+                tempReg = tempSet.getRegister();
+                s = tempReg + " = " + (*($1.registerName));
+                gen(functionInstruction, s, nextquad);
+            }
+            else{
+                tempReg = tempSet.getFloatRegister();
+                s = tempReg + " = " + (*($1.registerName));   
+                gen(functionInstruction, s, nextquad);
+            }
+            s = registerName + " = " + registerName + " * " + tempReg;
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(tempReg);
+            s = (*($1.registerName)) + " = " + registerName ;
+            gen(functionInstruction, s, nextquad);
+            $$.registerName = new string(registerName);
+            if ($1.offsetRegName != NULL) tempSet.freeRegister(*($1.offsetRegName));
+        }
+    }
     | LHS DIVASG ASG
+    {
+        if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
+            $$.type = ERRORTYPE;
+            errorFound = true;
+        }
+        else if ($3.type == NULLVOID) {
+            cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
+            $$.type = ERRORTYPE;
+            errorFound = true;
+        }
+        else {
+            $$.type = $1.type;
+            string registerName;
+            if ($1.type == INTEGER && $3.type == FLOATING) {
+                registerName = tempSet.getRegister();
+                string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
+                gen(functionInstruction, s, nextquad);
+                tempSet.freeRegister(*($3.registerName));
+            }
+            else if($1.type == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
+                registerName = tempSet.getFloatRegister();
+                string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
+                gen(functionInstruction, s, nextquad); 
+                tempSet.freeRegister(*($3.registerName));
+            }
+            else {
+                registerName = *($3.registerName);
+            }
+            string s, tempReg;
+            if($1.type == INTEGER){
+                tempReg = tempSet.getRegister();
+                s = tempReg + " = " + (*($1.registerName));
+                gen(functionInstruction, s, nextquad);
+            }
+            else{
+                tempReg = tempSet.getFloatRegister();
+                s = tempReg + " = " + (*($1.registerName));   
+                gen(functionInstruction, s, nextquad);
+            }
+            s = registerName + " = " + registerName + " / " + tempReg;
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(tempReg);
+            s = (*($1.registerName)) + " = " + registerName ;
+            gen(functionInstruction, s, nextquad);
+            $$.registerName = new string(registerName);
+            if ($1.offsetRegName != NULL) tempSet.freeRegister(*($1.offsetRegName));
+        }
+    }
     | LHS MODASG ASG
+    {
+        if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
+            $$.type = ERRORTYPE;
+            errorFound = true;
+        }
+        else if ($3.type == NULLVOID) {
+            cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
+            $$.type = ERRORTYPE;
+            errorFound = true;
+        }
+        else {
+            $$.type = $1.type;
+            string registerName;
+            if ($1.type == INTEGER && $3.type == FLOATING) {
+                registerName = tempSet.getRegister();
+                string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
+                gen(functionInstruction, s, nextquad);
+                tempSet.freeRegister(*($3.registerName));
+            }
+            else if($1.type == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
+                registerName = tempSet.getFloatRegister();
+                string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
+                gen(functionInstruction, s, nextquad); 
+                tempSet.freeRegister(*($3.registerName));
+            }
+            else {
+                registerName = *($3.registerName);
+            }
+            string s, tempReg;
+            if($1.type == INTEGER){
+                tempReg = tempSet.getRegister();
+                s = tempReg + " = " + (*($1.registerName));
+                gen(functionInstruction, s, nextquad);
+            }
+            else{
+                tempReg = tempSet.getFloatRegister();
+                s = tempReg + " = " + (*($1.registerName));   
+                gen(functionInstruction, s, nextquad);
+            }
+            s = registerName + " = " + registerName + " % " + tempReg;
+            gen(functionInstruction, s, nextquad);
+            tempSet.freeRegister(tempReg);
+            s = (*($1.registerName)) + " = " + registerName ;
+            gen(functionInstruction, s, nextquad);
+            $$.registerName = new string(registerName);
+            if ($1.offsetRegName != NULL) tempSet.freeRegister(*($1.offsetRegName));
+        }
+    }
 ;
 
 LHS: ID_ARR  
