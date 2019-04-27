@@ -58,7 +58,7 @@ void registerSet::freeRegister(string s){
 void gen(vector<string> &functionInstruction, string instruction, int &nextQuad){
     functionInstruction.push_back(instruction);
     nextQuad++;
-    // cout<<instruction<<endl;
+    // cout << instruction << endl;
     return;
 }
 

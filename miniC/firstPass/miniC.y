@@ -362,8 +362,6 @@ STMT: VAR_DECL
                 registerName = tempSet.getFloatRegister();
             }
             string s;
-            // string s = registerName + " = " + (*($2.registerName)) ;
-            // gen(functionInstruction, s, nextquad);
             s = "read " + registerName;
             gen(functionInstruction, s, nextquad);
             s = (*($2.registerName)) + " = " +  registerName;
@@ -404,6 +402,14 @@ STMT: VAR_DECL
         $$.continueList = new vector <int>;
         cout << "Line no. " << yylineno << ": Syntax error" << endl;
     }
+    | error
+    {
+        errorFound = 1;
+        $$.nextList = new vector<int>;
+        $$.breakList = new vector<int>;
+        $$.continueList = new vector <int>;
+        cout << "Line no. " << yylineno << ": Syntax error" << endl;
+    }
 ;
 
 VAR_DECL: D SEMI 
@@ -429,7 +435,6 @@ DEC_ID_ARR: ID
     {   
         int found = 0;
         typeRecord* vn = NULL;
-        // cout << "Scope : "<<scope<<endl;
         if(activeFuncPtr!=NULL){
             searchVariable(string($1), activeFuncPtr, found, vn, scope);
             if (found) {
@@ -770,11 +775,8 @@ ASG: CONDITION1
         $$.type = $1.type;
         if($$.type != ERRORTYPE && $$.type != NULLVOID) {
             $$.registerName = $1.registerName;
-            // backpatch($1.jumpList, nextquad, functionInstruction);
-            // gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
             if($1.jumpList!=NULL){
                 vector<int>* qList = new vector<int>;
-                // gen(functionInstruction,(*($$.registerName)) + " = 0",nextquad) ;
                 qList->push_back(nextquad);
                 gen(functionInstruction,"goto L",nextquad);
                 backpatch($1.jumpList, nextquad, functionInstruction);
@@ -1099,36 +1101,25 @@ SWITCHCASE: SWITCH LP ASG RP TEMP1 LCB  CASELIST RCB
         for(auto it : *($7.casepair)){
             if(it.first == "default"){
                 gen(functionInstruction, "goto L"+to_string(it.second), nextquad);
-                // break;
             }
             else{
                 gen(functionInstruction, "if "+ (*($3.registerName)) +" == "+ it.first + " goto L" + to_string(it.second), nextquad);
             }
-            // tempSet.freeRegister(it.first);            
         }
         $7.casepair->clear();
         backpatch(qList, nextquad, functionInstruction);
         backpatch($7.breakList, nextquad, functionInstruction);
         gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
-        
-        // switchVar.pop_back();
-        // tempSet.freeRegister(*($3.registerName));
-        
-        // gen(functionInstruction, "L" + to_string(nextquad)+":", nextquad);
     }
 ;
 
 TEMP1: %empty
     {
-        // string varName = switchVar[switchVar.size()-1]; 
         $$.begin=nextquad;
         $$.falseList = new vector<int>;
         $$.falseList->push_back(nextquad);
         gen(functionInstruction, "goto L", nextquad);
-        // gen(functionInstruction, "if "+ varName +" != "+ conditionVar + " goto L", nextquad);   
-        // tempSet.freeRegister(conditionVar);
         scope++;
-
     }
 ;
 
@@ -1141,7 +1132,6 @@ TEMP2:%empty
 
 CASELIST:
     CASE MINUS NUMINT TEMP2 {
-        // sVar.push_back(make_pair(string($2), nextquad));
         $4.casepair->push_back(make_pair("-"+string($3), nextquad));
         gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
         } COLON BODY 
@@ -1151,7 +1141,6 @@ CASELIST:
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
         $$.casepair = new vector<pair<string,int>>;
-        // $$.casepair->push_back(make_pair(string($2), nextquad));
         merge($$.continueList,$8.continueList);
         merge($$.breakList, $8.breakList);
         merge($$.nextList, $8.nextList);
@@ -1160,11 +1149,9 @@ CASELIST:
         merge($$.nextList, $7.nextList);
         mergeSwitch($$.casepair, $8.casepair);
         mergeSwitch($$.casepair, $4.casepair);
-        // sVar.clear();
     }
     |
     CASE NUMINT TEMP2 {
-        // sVar.push_back(make_pair(string($2), nextquad));
         $3.casepair->push_back(make_pair(string($2), nextquad));
         gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
         } COLON BODY 
@@ -1174,7 +1161,6 @@ CASELIST:
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
         $$.casepair = new vector<pair<string,int>>;
-        // $$.casepair->push_back(make_pair(string($2), nextquad));
         merge($$.continueList,$6.continueList);
         merge($$.breakList, $6.breakList);
         merge($$.nextList, $6.nextList);
@@ -1183,7 +1169,6 @@ CASELIST:
         merge($$.nextList, $7.nextList);
         mergeSwitch($$.casepair, $7.casepair);
         mergeSwitch($$.casepair, $3.casepair);
-        // sVar.clear();
     }
     | %empty
     {
@@ -1194,11 +1179,9 @@ CASELIST:
     }
     | DEFAULT COLON TEMP2 {
         $3.casepair->push_back(make_pair("default", nextquad));
-        // sVar.push_back(make_pair("default", nextquad));
         gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
     }
      BODY {
-        // gen(functionInstruction, "L" + to_string(nextquad)+":", nextquad);
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.casepair = new vector<pair<string,int>>;
@@ -1207,7 +1190,6 @@ CASELIST:
         merge($$.breakList, $5.breakList);
         merge($$.nextList, $5.nextList);
         mergeSwitch($$.casepair, $3.casepair);
-        // sVar.clear();
     }
 ;
 
@@ -1281,7 +1263,6 @@ FOREXP: FOR LP ASG1 SEMI M3 ASG1 Q3 {
         if($3.type!=NULLVOID){
             tempSet.freeRegister(*($3.registerName));
         }
-        // tempSet.freeRegister(*($3.registerName));
         if($6.type!=NULLVOID){
             tempSet.freeRegister(*($6.registerName));
         }
@@ -1293,7 +1274,8 @@ FOREXP: FOR LP ASG1 SEMI M3 ASG1 Q3 {
     {
         errorFound = 1;
         $$.falseList = new vector<int>;
-        cout << "Line no. " << yylineno << ": Syntax error in for loop" << endl;
+        cout << "Line no. " << yylineno << ": Syntax error in for loop, discarded token till RP" << endl;
+        scope++;
     }
 ;
 
@@ -1326,21 +1308,15 @@ M2: %empty
 
 IFSTMT: IFEXP LCB BODY RCB 
     {
-        // cout<<"Test1"<<endl;
         deleteVarList(activeFuncPtr,scope);
-        // cout<<"Test2"<<endl;
         scope--;
         $$.nextList= new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList= new vector<int>;
         merge($$.nextList, $1.falseList);
-        // cout<<"Test5"<<endl;
         merge($$.breakList, $3.breakList);
-        // cout<<"Test6"<<endl;
         merge($$.continueList, $3.continueList);
-        // cout<<"Test3"<<endl;
         backpatch($$.nextList,nextquad,functionInstruction);
-        // cout<<"Test4"<<endl;
         gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
     }
     | IFEXP LCB BODY RCB {deleteVarList(activeFuncPtr,scope);} M2 ELSE M1 LCB BODY RCB
@@ -1351,21 +1327,13 @@ IFSTMT: IFEXP LCB BODY RCB
         $$.breakList = new vector<int>;
         $$.continueList= new vector<int>;
         backpatch($1.falseList,$8,functionInstruction);
-        // cout<<"test6"<<endl;
         merge($$.nextList,$6.nextList );
-        // cout<<"test7"<<endl;
         backpatch($$.nextList,nextquad,functionInstruction);
-        // cout<<"test8"<<endl;
         gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
-        // cout<<"test9"<<endl;
         merge($$.breakList, $3.breakList);
-        // cout<<"test10"<<endl;
         merge($$.continueList, $3.continueList);
-        // cout<<"test11"<<endl;
         merge($$.breakList, $10.breakList);
-        // cout<<"test12"<<endl;
         merge($$.continueList, $10.continueList);
-        // cout<<"test13"<<endl;
     }
 ;
 
@@ -1387,7 +1355,8 @@ IFEXP: IF LP ASG RP
     {
         errorFound = 1;
         $$.falseList = new vector <int>;
-        cout << "Line no. " << yylineno << ": Syntax error in if" << endl;
+        cout << "Line no. " << yylineno << ": Syntax error in if, discarding tokens till RP" << endl;
+        scope++;
     }
 ;
 
@@ -1425,7 +1394,8 @@ WHILEEXP: WHILE M1 LP ASG RP
     | WHILE error RP
     {   
         $$.falseList = new vector<int>;
-        cout << "Line no. " << yylineno << ": Syntax error in while loop" << endl;
+        cout << "Line no. " << yylineno << ": Syntax error in while loop, discarding tokens till RP" << endl;
+        scope++;
     }
 ;
 
@@ -1450,14 +1420,13 @@ CONDITION1: CONDITION1 TP1
         }
         else if($1.type == NULLVOID || $5.type == NULLVOID){
             $$.type = ERRORTYPE;
-            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
+            cout << "Line no. "<< yylineno << ": Both the expessions should not be NULL" << endl;
         }
         else{
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());
             vector<int>* qList = new vector<int>;
             if($5.jumpList!=NULL){
-                // gen(functionInstruction,(*($$.registerName)) + " =  x 1",nextquad) ;
                 qList->push_back(nextquad);
                 gen(functionInstruction,"goto L",nextquad);
                 backpatch($5.jumpList, nextquad, functionInstruction);
@@ -1471,9 +1440,6 @@ CONDITION1: CONDITION1 TP1
             $$.jumpList = new vector<int>;
             merge($$.jumpList,$1.jumpList);
             
-            
-            // ($$.jumpList)->push_back(nextquad);
-            // gen(functionInstruction, "if " + *($1.registerName) + "!= 0 goto L", nextquad);
             merge($$.jumpList, $2.temp);
             ($$.jumpList)->push_back(nextquad);
             gen(functionInstruction, "if " + *($5.registerName) + "!= 0 goto L", nextquad);
@@ -1519,7 +1485,7 @@ CONDITION2: CONDITION2 TP1
         }
         else if($1.type == NULLVOID || $5.type == NULLVOID){
             $$.type = ERRORTYPE;
-            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
+            cout << "Line no. "<< yylineno << ": Both the expessions should not be NULL" << endl;
         }
         else{
             $$.type = BOOLEAN;
@@ -1528,8 +1494,6 @@ CONDITION2: CONDITION2 TP1
             merge($$.jumpList,$1.jumpList);
             vector<int>* qList = new vector<int>;
             
-            // ($$.jumpList)->push_back(nextquad);
-            // gen(functionInstruction, "if " + *($1.registerName) + " == 0 " +" goto L", nextquad);
             merge($$.jumpList, $2.temp);
             ($$.jumpList)->push_back(nextquad);
             gen(functionInstruction, "if " + *($5.registerName) + " == 0 "+" goto L", nextquad);
@@ -2219,6 +2183,7 @@ BR_DIMLIST: LSB ASG RSB
 
 void yyerror(char *s)
 {      
+    errorFound=1;
     // cout << "Line no. " << yylineno << ": Syntax error" << endl;
     // fflush(stdout);
 }

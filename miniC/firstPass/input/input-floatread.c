@@ -7,7 +7,7 @@ int min(int a, int b){
 
 
 int main(){
-    int arr[10];
+    float arr[10];
     int n;
     read n;
     if(n <= 0){
