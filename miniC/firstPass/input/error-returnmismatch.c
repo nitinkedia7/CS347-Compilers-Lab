@@ -1,10 +1,8 @@
 float fib(int n) {
     if (n <= 2) {
-        return 1;
+        return;
     }
-    float a = fib(n-1) + fib(n-2);
-    print a;
-    return a;
+    return fib(n-1) + fib(n-2);
 }
 
 int main() {

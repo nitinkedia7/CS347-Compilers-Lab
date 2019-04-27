@@ -5,8 +5,7 @@ rm output/symtab.txt
 rm ../secondPass/mips.s 
 sleep 1
 
-read -p 'File Name: ' varname
-./miniC < "input/"$varname
+./miniC < "input/"$1
 cd ../secondPass
 ./inter < ../firstPass/output/intermediate.txt
 cd ../firstPass

@@ -15,5 +15,7 @@ int main() {
     s = 0;
     s = sum(s+1, s+2, s+3, s+4, s+5, sum(1,2,3,4,5,6));
     y = sum(1,2,3,4,5,6);
+    print s;
+    print y;
     return 0;
 }

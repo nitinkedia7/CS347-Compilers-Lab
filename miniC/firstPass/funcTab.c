@@ -274,7 +274,7 @@ void populateOffsets(vector<funcEntry*> &funcEntryRecord, vector<typeRecord*> &g
         }
         // offset += 80;
         offset = 0;
-        offset += 48;
+        offset += 92;
         for(auto &varRecord : funcRecord->variableList){
             varRecord->varOffset = offset;
             offset += 4*(varRecord->maxDimlistOffset);

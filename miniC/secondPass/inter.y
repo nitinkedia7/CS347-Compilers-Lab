@@ -548,11 +548,17 @@ void saveRegisters(int frameSize){
     for(int i=0; i<10; i++){
         fprintf(mips, "sw $t%d, %d($sp)\n", i, frameSize-2*INTSIZE-(i+1)*INTSIZE);
     }
+    for(int i=0; i<11; i++){
+        fprintf(mips, "s.s $f%d, %d($sp)\n", i, frameSize-2*INTSIZE-(i+11)*INTSIZE);
+    }
 }
 
 void retrieveRegisters(int frameSize){
     for(int i=0; i<10; i++){
         fprintf(mips, "lw $t%d, %d($sp)\n", i, frameSize-2*INTSIZE-(i+1)*INTSIZE);
+    }
+    for(int i=0; i<11; i++){
+        fprintf(mips, "l.s $f%d, %d($sp)\n", i, frameSize-2*INTSIZE-(i+11)*INTSIZE);
     }
 }
 

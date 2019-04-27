@@ -20,7 +20,7 @@ public:
             tempRegister.push_back(i);
         }
         floatRegister.clear();
-        for(int i=30; i>=0; i--){
+        for(int i=10; i>=0; i--){
             if(i==0||i==12){
                 continue;
             }

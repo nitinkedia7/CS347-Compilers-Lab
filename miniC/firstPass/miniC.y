@@ -341,14 +341,40 @@ STMT: VAR_DECL
             }
             else {
                 string s;
-                if ($2.type != NULLVOID) {
-                    s = "return " + (*($2.registerName));
-                    tempSet.freeRegister(*($2.registerName));
+                if (activeFuncPtr->returnType != NULLVOID && $2.type != NULLVOID) {
+                    if ($2.type == INTEGER && activeFuncPtr->returnType == FLOATING)  {
+                        string floatReg = tempSet.getFloatRegister();
+                        s = floatReg + " = " + "convertToFloat(" + *($2.registerName) + ")";
+                        gen(functionInstruction, s, nextquad);
+                        s = "return " + floatReg;
+                        gen(functionInstruction, s, nextquad);
+                        tempSet.freeRegister(*($2.registerName));
+                        tempSet.freeRegister(floatReg);
+                    }
+                    else if ($2.type == FLOATING && activeFuncPtr->returnType == INTEGER) {
+                        string intReg = tempSet.getRegister();
+                        s = intReg + " = " + "convertToInt(" + *($2.registerName) + ")";
+                        gen(functionInstruction, s, nextquad);
+                        s = "return " + intReg;
+                        gen(functionInstruction, s, nextquad);
+                        tempSet.freeRegister(*($2.registerName));
+                        tempSet.freeRegister(intReg);                        
+                    }
+                    else {
+                        s = "return " + *($2.registerName);
+                        gen(functionInstruction, s, nextquad);
+                        tempSet.freeRegister(*($2.registerName));
+                    }
+                }
+                else if (activeFuncPtr->returnType == NULLVOID && $2.type == NULLVOID) {
+                    s = "return";
+                    gen(functionInstruction, s, nextquad);
                 }
                 else {
-                    s = "return";
-                }
-                gen(functionInstruction, s, nextquad);
+                    errorFound = 1;
+                    cout << "Line no. " << yylineno << ": Exactly one of function " << activeFuncPtr->name << "and this return statement has void return type" << endl;
+                    if ($2.type != NULLVOID) tempSet.freeRegister(*($2.registerName));
+                } 
             }
         }
     }
@@ -1956,15 +1982,33 @@ FACTOR: ID_ARR
     {
         $$.type = $2.type;
         if($2.type != ERRORTYPE){
-            if ($$.type == INTEGER)
+            string s="";
+            if ($$.type == INTEGER){
                 $$.registerName = new string(tempSet.getRegister());
-            else $$.registerName = new string(tempSet.getFloatRegister());
-            string s = (*($$.registerName)) + " = -" + (*($2.registerName)) ;
+                string temp=tempSet.getRegister();
+                string temp1=tempSet.getRegister();
+                gen(functionInstruction, temp + " = 0", nextquad);
+                gen(functionInstruction, temp1 + " = " +  (*($2.registerName)), nextquad);
+                s = (*($$.registerName)) + " = " + temp + " -" + temp1 ;
+                tempSet.freeRegister(temp);
+                tempSet.freeRegister(temp1);
+            }
+            else{ 
+                $$.registerName = new string(tempSet.getFloatRegister());
+                string temp=tempSet.getFloatRegister();
+                string temp1=tempSet.getRegister();
+                gen(functionInstruction, temp + " = 0", nextquad);
+                gen(functionInstruction, temp1 + " = " +  (*($2.registerName)), nextquad);
+                s = (*($$.registerName)) + " = 0 -" + temp1 ;
+                tempSet.freeRegister(temp);
+                tempSet.freeRegister(temp1);
+            }
+            // string s = (*($$.registerName)) + " = 0 -" + (*($2.registerName)) ;
             gen(functionInstruction, s, nextquad);
             if($2.offsetRegName != NULL){
                 tempSet.freeRegister((*($2.offsetRegName)));
             }
-        }        
+        }       
     }
     | MINUS NUMINT
     {
