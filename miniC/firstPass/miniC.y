@@ -25,6 +25,7 @@ vector<typeRecord*> typeRecordList;
 stack<vector<typeRecord*> > paramListStack;
 typeRecord* varRecord;
 vector<int> decdimlist;
+vector<typeRecord*> globalVariables;
 
 int nextquad;
 vector<string> functionInstruction;
@@ -115,7 +116,7 @@ MAIN_HEAD: INT MAIN LP RP
         typeRecordList.clear();
         searchFunc(activeFuncPtr, funcEntryRecord, found);
         if (found) {
-            cout << "Function already declared: " << activeFuncPtr->name << endl;
+            cout << "Line no. " << yylineno << ": Function " << activeFuncPtr->name <<  " already declared." << endl;
             delete activeFuncPtr;
             activeFuncPtr = NULL;
         }   
@@ -140,24 +141,23 @@ FUNC_DEF: FUNC_HEAD LCB BODY RCB
 
 FUNC_HEAD: RES_ID LP DECL_PLIST RP
     {
-        if (activeFuncPtr != NULL) {
+        int found = 0;
+        searchFunc(activeFuncPtr, funcEntryRecord, found);
+        if(found){
+            cout << "Line no. " << yylineno << ": Function " << activeFuncPtr->name <<  " already declared." << endl;
+            errorFound = true;
+            delete activeFuncPtr;
+            cout<<"Function head me activeFuncPtr deleted"<<endl;
+        }   
+        else{
             activeFuncPtr->numOfParam = typeRecordList.size();
             activeFuncPtr->parameterList = typeRecordList;
             activeFuncPtr->functionOffset = 0;
             typeRecordList.clear();
-            searchFunc(activeFuncPtr, funcEntryRecord, found);
-            if(found){
-                cout << "Function already declared: " <<activeFuncPtr->name << endl;
-                errorFound = true;
-                delete activeFuncPtr;
-                activeFuncPtr=NULL;
-            }   
-            else{
-                addFunction(activeFuncPtr, funcEntryRecord);
-                scope = 2; 
-                string s = "function begin _" + activeFuncPtr->name;
-                gen(functionInstruction, s, nextquad);
-            }
+            addFunction(activeFuncPtr, funcEntryRecord);
+            scope = 2; 
+            string s = "function begin _" + activeFuncPtr->name;
+            gen(functionInstruction, s, nextquad);
         }
     }
 ;
@@ -182,24 +182,26 @@ DECL_PLIST: DECL_PL
 
 DECL_PL: DECL_PL COMMA DECL_PARAM
     {
+        int found = 0;
         typeRecord* pn = NULL;
         searchParam(varRecord->name, typeRecordList, found, pn);
         if(found){
-            cout<<"Redeclaration of parameter "<<(varRecord->name)<<endl;
+            cout << "Line no. " << yylineno << ": Redeclaration of parameter " << varRecord->name <<endl;
         } else {
-            // cout<<"\nVar Name:"<<varRecord->name<<endl;
+            // cout << "Variable: "<< varRecord->name << " declared." << endl;
             typeRecordList.push_back(varRecord);
         }
         
     }
     | DECL_PARAM
     {  
+        int found = 0;
         typeRecord* pn = NULL;
         searchParam(varRecord->name, typeRecordList, found , pn );
         if (found){
-            cout<<"Redeclaration of parameter"<<(varRecord->name)<<endl;
+            cout << "Line no. " << yylineno << ": Redeclaration of parameter " << varRecord->name <<endl;
         } else {
-            // cout<<"\nVar Name : "<<varRecord->name<<endl;
+            // cout << "Variable: "<< varRecord->name << " declared." << endl;
             typeRecordList.push_back(varRecord);
         }
     }
@@ -270,22 +272,26 @@ STMT: VAR_DECL
         if ($1.type != NULLVOID && $1.type != ERRORTYPE)
             tempSet.freeRegister(*($1.registerName));
     } 
-    | FORLOOP{
+    | FORLOOP
+    {
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
     }
-    | IFSTMT{
+    | IFSTMT
+    {
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
     }
-    | WHILESTMT{
+    | WHILESTMT
+    {
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
     }
-    | SWITCHCASE{
+    | SWITCHCASE
+    {
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
@@ -298,46 +304,46 @@ STMT: VAR_DECL
         deleteVarList(activeFuncPtr, scope);
         scope--;
     }
-    | BREAK SEMI{
+    | BREAK SEMI
+    {
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
         $$.breakList->push_back(nextquad);  
         gen(functionInstruction, "goto L", nextquad);      
     }
-    | CONTINUE SEMI{
+    | CONTINUE SEMI
+    {
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
         $$.continueList->push_back(nextquad);
         gen(functionInstruction, "goto L", nextquad);
     }
-    | RETURN ASG SEMI 
+    | RETURN ASG1 SEMI 
     {
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
-        // if(activeFuncPtr!=NULL){
-            if ($2.type != ERRORTYPE && activeFuncPtr != NULL) {
-                if (activeFuncPtr->returnType == NULLVOID && $2.type != NULLVOID) {
-                    cout<<"The function "<< activeFuncPtr->name<<" has void return type"<<endl;
-                }
-                else if (activeFuncPtr->returnType != NULLVOID && $2.type == NULLVOID) {
-                    cout<<"The function "<< activeFuncPtr->name<<" must have a"<<" return type"<<endl;
+        if ($2.type != ERRORTYPE && activeFuncPtr != NULL) {
+            if (activeFuncPtr->returnType == NULLVOID && $2.type != NULLVOID) {
+                cout << "Line no. " << yylineno << ": function " << activeFuncPtr->name << " has void return type not " << $2.type << endl;
+            }
+            else if (activeFuncPtr->returnType != NULLVOID && $2.type == NULLVOID) {
+                cout << "Line no. " << yylineno << ": function " << activeFuncPtr->name << " has non-void return type" << endl;
+            }
+            else {
+                string s;
+                if ($2.type != NULLVOID) {
+                    s = "return " + (*($2.registerName));
+                    tempSet.freeRegister(*($2.registerName));
                 }
                 else {
-                    string s;
-                    if ($2.type != NULLVOID) {
-                        s = "return " + (*($2.registerName));
-                        tempSet.freeRegister(*($2.registerName));
-                    }
-                    else {
-                        s = "return";
-                    }
-                    gen(functionInstruction, s, nextquad);
+                    s = "return";
                 }
+                gen(functionInstruction, s, nextquad);
             }
-        // }   
+        }
     }
     | READ ID_ARR SEMI
     {
@@ -396,8 +402,7 @@ STMT: VAR_DECL
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
-        printf("Error: syntax error in line number %d\n",yylineno-1);
-        printf("==================STMT============\n");
+        cout << "Line no. " << yylineno << ": Syntax error" << endl;
     }
 ;
 
@@ -422,7 +427,6 @@ L: DEC_ID_ARR
 
 DEC_ID_ARR: ID
     {   
-        // printf("var $1:%s\n", $1);
         int found = 0;
         typeRecord* vn = NULL;
         // cout << "Scope : "<<scope<<endl;
@@ -430,7 +434,7 @@ DEC_ID_ARR: ID
             searchVariable(string($1), activeFuncPtr, found, vn, scope);
             if (found) {
                 if(vn->isValid==true){
-                    printf("Variable %s already declared at same level %d\n", $1, scope);
+                    printf("Line no. %d: Variable %s already declared at same level %d\n", yylineno, $1, scope);
                 }
                 else{
                     if(vn->eleType == resultType){
@@ -454,18 +458,16 @@ DEC_ID_ARR: ID
                 typeRecord* pn = NULL;
                 searchParam(string($1), activeFuncPtr->parameterList, found , pn);
                 if (found) {
-                    printf("Parameter with name %s exists %d\n", $1, scope);
+                    printf("Line no. %d: Vaiable %s is already declared as a parameter with scope %d\n", yylineno, $1, scope);
                 } 
                 else {
                     varRecord = new typeRecord;
                     varRecord->name = string($1);
-                    // printf("var $1:%s\n", $1);
                     varRecord->type = SIMPLE;
                     varRecord->tag = VARIABLE;
                     varRecord->scope = scope;
                     varRecord->isValid=true;
                     varRecord->maxDimlistOffset=1;
-                    // cout<<"variable name: "<<varRecord->name<<endl;
                     typeRecordList.push_back(varRecord);
                 }
             }
@@ -477,7 +479,6 @@ DEC_ID_ARR: ID
                 varRecord->scope = scope;
                 varRecord->isValid=true;
                 varRecord->maxDimlistOffset=1;
-                // cout<<"variable name: "<<varRecord->name<<endl;
                 typeRecordList.push_back(varRecord);
             }
         } else {
@@ -489,13 +490,12 @@ DEC_ID_ARR: ID
     {
         int found = 0;
         typeRecord* vn = NULL;
-        // cout << "Scope : "<<scope<<endl;
         if(activeFuncPtr!=NULL){
             searchVariable(string($1), activeFuncPtr, found, vn, scope);
             bool varCreated = false;;
             if (found) {
                 if(vn->isValid==true){
-                    printf("Variable %s already declared at same level %d\n", $1, scope);
+                    printf("Line no. %d: Variable %s already declared at same level %d\n", yylineno, $1, scope);
                 }
                 else{
                     if(vn->eleType == resultType){
@@ -521,18 +521,16 @@ DEC_ID_ARR: ID
                 typeRecord* pn = NULL;
                 searchParam(string($1), activeFuncPtr->parameterList, found , pn);
                 if (found) {
-                    printf("Parameter with name %s exists %d\n", $1, scope);
+                    printf("Line no. %d: Vaiable %s is already declared as a parameter with scope %d\n", yylineno, $1, scope);
                 } 
                 else {
                     varRecord = new typeRecord;
                     varRecord->name = string($1);
-                    // printf("var $1:%s\n", $1);
                     varRecord->type = SIMPLE;
                     varRecord->tag = VARIABLE;
                     varRecord->scope = scope;
                     varRecord->maxDimlistOffset=1;
                     varRecord->isValid=true;
-                    // cout<<"variable name: "<<varRecord->name<<endl;
                     typeRecordList.push_back(varRecord);
                     varCreated = true;
                 }
@@ -545,7 +543,6 @@ DEC_ID_ARR: ID
                 varRecord->scope = scope;
                 varRecord->maxDimlistOffset=1;
                 varRecord->isValid=true;
-                // cout<<"variable name: "<<varRecord->name<<endl;
                 typeRecordList.push_back(varRecord);
                 varCreated = true;
             }
@@ -554,7 +551,7 @@ DEC_ID_ARR: ID
                     errorFound = true;
                 }
                 else if ($3.type == NULLVOID) {
-                    cout << "Cannot assign void to non-void type " << string($1) << endl;
+                    cout << "Line no. " << yylineno << ": Cannot assign void to non-void type " << string($1) << endl;
                     errorFound = true;
                 }
                 else {
@@ -593,7 +590,7 @@ DEC_ID_ARR: ID
             searchVariable(string($1), activeFuncPtr, found, vn,scope); 
             if (found) {
                 if(vn->isValid==true){
-                    printf("Variable %s already declared at same level %d\n", $1, scope);
+                    printf("Line no. %d: Variable %s already declared at same level %d\n", yylineno, $1, scope);
                 }
                 else{
                     if(vn->eleType == resultType){
@@ -622,7 +619,6 @@ DEC_ID_ARR: ID
                             a*=(it);
                         }
                         varRecord->maxDimlistOffset = a;
-                        // cout<<"variable name: "<<varRecord->name<<endl;
                         typeRecordList.push_back(varRecord);
                     }
                 }
@@ -631,7 +627,7 @@ DEC_ID_ARR: ID
                 typeRecord* pn = NULL;
                 searchParam(string($1), activeFuncPtr->parameterList, found, pn);
                 if (found) {
-                    printf("Parameter with name %s exists %d\n", $1, scope);
+                    printf("Line no. %d: Vaiable %s is already declared as a parameter with scope %d\n", yylineno, $1, scope);
                 } 
                 else {
                     varRecord = new typeRecord;
@@ -646,7 +642,6 @@ DEC_ID_ARR: ID
                         a*=(it);
                     }
                     varRecord->maxDimlistOffset = a;
-                    // cout<<"variable name: "<<varRecord->name<<endl;
                     typeRecordList.push_back(varRecord);
                 }
             }
@@ -689,27 +684,44 @@ FUNC_CALL: ID LP PARAMLIST RP
         int found = 0;
         // printFunction(activeFuncPtr);
         // printFunction(callFuncPtr);
-        compareFunc(callFuncPtr,funcEntryRecord,found);
-        $$.type = ERRORTYPE;
-        if (found == 0) {
-            cout << "No function with name " << string($1) << " exists" << endl;
-        }
-        else if (found == -1) {
-            cout << "Parameter list does not match with defined paramters of function " << string($1) << endl;
+        int vfound=0;
+        typeRecord* vn;
+        searchVariable(callFuncPtr->name,activeFuncPtr,vfound,vn,scope);
+        if (vfound) {
+            $$.type = ERRORTYPE;
+            cout<< "Line no." << yylineno << ": called object "<< callFuncPtr->name << " is not a function or function pointer"<< endl;
         }
         else {
-            $$.type = callFuncPtr->returnType;
-            int isRefParam = 0;
-            if(callFuncPtr->returnType == INTEGER){
-                $$.registerName = new string(tempSet.getRegister());
-                isRefParam++;
+            compareFunc(callFuncPtr,funcEntryRecord,found);
+            $$.type = ERRORTYPE;
+            if (found == 0) {
+                cout << "Line no. " << yylineno << ":  ";
+                cout << "No function with name " << string($1) << " exists" << endl;
             }
-            else if(callFuncPtr->returnType == FLOATING){
-                $$.registerName = new string(tempSet.getFloatRegister());
-                isRefParam++;
+            else if (found == -1) {
+                cout << "Line no. " << yylineno << ":  ";
+                cout << "call parameter list does not match with defined paramters of function " << string($1) << endl;
             }
-            gen(functionInstruction, "refparam " + (*($$.registerName)), nextquad);
-            gen(functionInstruction, "call _" + callFuncPtr->name + ", " + to_string(typeRecordList.size() + isRefParam ), nextquad);       
+            else {
+                $$.type = callFuncPtr->returnType;
+                if(callFuncPtr->returnType == INTEGER){
+                    $$.registerName = new string(tempSet.getRegister());
+                    gen(functionInstruction, "refparam " + (*($$.registerName)), nextquad);
+                    gen(functionInstruction, "call _" + callFuncPtr->name + ", " + to_string(typeRecordList.size() + 1 ), nextquad);      
+                }
+                else if(callFuncPtr->returnType == FLOATING){
+                    $$.registerName = new string(tempSet.getFloatRegister());
+                    gen(functionInstruction, "refparam " + (*($$.registerName)), nextquad);
+                    gen(functionInstruction, "call _" + callFuncPtr->name + ", " + to_string(typeRecordList.size() + 1 ), nextquad);      
+                }
+                else if (callFuncPtr->returnType == NULLVOID) {
+                    $$.registerName = NULL;
+                    gen(functionInstruction, "call _" + callFuncPtr->name + ", " + to_string(typeRecordList.size()), nextquad);      
+                }
+                else {
+                    cout << "Line no. " << yylineno << ": Illegal return type of function " << callFuncPtr->name << endl;
+                }
+            }
         }
         typeRecordList.clear();
         typeRecordList.swap(paramListStack.top());
@@ -756,7 +768,7 @@ PLIST: PLIST COMMA ASG
 ASG: CONDITION1
     {
         $$.type = $1.type;
-        if($$.type != ERRORTYPE) {
+        if($$.type != ERRORTYPE && $$.type != NULLVOID) {
             $$.registerName = $1.registerName;
             // backpatch($1.jumpList, nextquad, functionInstruction);
             // gen(functionInstruction, "L" + to_string(nextquad) + ":", nextquad);
@@ -781,6 +793,7 @@ ASG: CONDITION1
             errorFound = true;
         }
         else if ($3.type == NULLVOID) {
+            cout << "Line no. " << yylineno << ":  ";
             cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
             $$.type = ERRORTYPE;
             errorFound = true;
@@ -816,6 +829,7 @@ ASG: CONDITION1
             errorFound = true;
         }
         else if ($3.type == NULLVOID) {
+            cout << "Line no. " << yylineno << ":  ";
             cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
             $$.type = ERRORTYPE;
             errorFound = true;
@@ -865,6 +879,7 @@ ASG: CONDITION1
             errorFound = true;
         }
         else if ($3.type == NULLVOID) {
+            cout << "Line no. " << yylineno << ":  ";
             cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
             $$.type = ERRORTYPE;
             errorFound = true;
@@ -914,6 +929,7 @@ ASG: CONDITION1
             errorFound = true;
         }
         else if ($3.type == NULLVOID) {
+            cout << "Line no. " << yylineno << ":  ";
             cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
             $$.type = ERRORTYPE;
             errorFound = true;
@@ -963,6 +979,7 @@ ASG: CONDITION1
             errorFound = true;
         }
         else if ($3.type == NULLVOID) {
+            cout << "Line no. " << yylineno << ":  ";
             cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
             $$.type = ERRORTYPE;
             errorFound = true;
@@ -1012,6 +1029,7 @@ ASG: CONDITION1
             errorFound = true;
         }
         else if ($3.type == NULLVOID) {
+            cout << "Line no. " << yylineno << ":  ";
             cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
             $$.type = ERRORTYPE;
             errorFound = true;
@@ -1275,15 +1293,14 @@ FOREXP: FOR LP ASG1 SEMI M3 ASG1 Q3 {
     {
         errorFound = 1;
         $$.falseList = new vector<int>;
-        printf("Error: syntax error in line number %d\n", yylineno-1);
-        printf("=================FOR=============\n");
+        cout << "Line no. " << yylineno << ": Syntax error in for loop" << endl;
     }
 ;
 
 ASG1: ASG
     {
         $$.type= $1.type;
-        if ($$.type == ERRORTYPE) {
+        if ($1.type != ERRORTYPE && $1.type != NULLVOID) {
             $$.registerName = $1.registerName;
         }
     }
@@ -1358,7 +1375,7 @@ IFEXP: IF LP ASG RP
             $$.falseList = new vector <int>;
             $$.falseList->push_back(nextquad);
             if($3.type == NULLVOID){
-                cout<<"Expression in if statement can't be empty"<<endl;
+                cout << "Line no. " << yylineno << "condition in if statement can't be empty" << endl;
                 errorFound=true;
             }
             gen(functionInstruction, "if "+ (*($3.registerName)) + " == 0 goto L", nextquad);
@@ -1370,8 +1387,7 @@ IFEXP: IF LP ASG RP
     {
         errorFound = 1;
         $$.falseList = new vector <int>;
-        printf("Error: syntax error in line number %d\n", yylineno-1);
-        printf("==================IF ERROR=============\n");
+        cout << "Line no. " << yylineno << ": Syntax error in if" << endl;
     }
 ;
 
@@ -1395,6 +1411,7 @@ WHILEEXP: WHILE M1 LP ASG RP
     {
         scope++;
         if($4.type == NULLVOID || $4.type == ERRORTYPE){
+            cout << "Line no. " << yylineno << ":  ";
             cout<<"Expression in if statement can't be empty"<<endl;
             errorFound = true;
         }
@@ -1408,8 +1425,7 @@ WHILEEXP: WHILE M1 LP ASG RP
     | WHILE error RP
     {   
         $$.falseList = new vector<int>;
-        printf("Error: syntax error in line number %d\n", yylineno-1);
-        printf("===============WHILE===============\n");
+        cout << "Line no. " << yylineno << ": Syntax error in while loop" << endl;
     }
 ;
 
@@ -1431,6 +1447,10 @@ CONDITION1: CONDITION1 TP1
     {
         if($1.type==ERRORTYPE || $5.type==ERRORTYPE){
             $$.type = ERRORTYPE;
+        }
+        else if($1.type == NULLVOID || $5.type == NULLVOID){
+            $$.type = ERRORTYPE;
+            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
         }
         else{
             $$.type = BOOLEAN;
@@ -1466,7 +1486,7 @@ CONDITION1: CONDITION1 TP1
     | CONDITION2
     {
         $$.type = $1.type;
-        if ($$.type != ERRORTYPE) {
+        if ($$.type != ERRORTYPE && $$.type != NULLVOID) {
             $$.registerName = $1.registerName; 
             if($1.jumpList!=NULL){
                 vector<int>* qList = new vector<int>;
@@ -1497,6 +1517,10 @@ CONDITION2: CONDITION2 TP1
         if ($1.type==ERRORTYPE || $5.type==ERRORTYPE) {
             $$.type = ERRORTYPE;
         }
+        else if($1.type == NULLVOID || $5.type == NULLVOID){
+            $$.type = ERRORTYPE;
+            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
+        }
         else{
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());
@@ -1519,7 +1543,7 @@ CONDITION2: CONDITION2 TP1
     | EXPR1
     {
         $$.type = $1.type;
-        if ($$.type != ERRORTYPE) {
+        if ($1.type != ERRORTYPE && $1.type != NULLVOID) {
             $$.registerName = $1.registerName; 
             $$.jumpList = new vector<int>;
             $$.jumpList=NULL;   
@@ -1530,7 +1554,7 @@ CONDITION2: CONDITION2 TP1
 EXPR1: NOT EXPR21
     {
         $$.type = $2.type;
-        if ($$.type != ERRORTYPE) {
+        if ($2.type != ERRORTYPE && $2.type != NULLVOID) {
             $$.registerName = $2.registerName;
             string s = (*($$.registerName)) + " = ~" + (*($2.registerName));   
             gen(functionInstruction, s, nextquad);
@@ -1539,7 +1563,7 @@ EXPR1: NOT EXPR21
     | EXPR21
     {
         $$.type = $1.type;
-        if ($$.type != ERRORTYPE) {
+        if ($1.type != ERRORTYPE && $1.type != NULLVOID) {
             $$.registerName = $1.registerName;    
         }
     }
@@ -1549,6 +1573,10 @@ EXPR21: EXPR2 EQUAL EXPR2
     {
         if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
             $$.type = ERRORTYPE;
+        }
+        else if($1.type == NULLVOID || $3.type == NULLVOID){
+            $$.type = ERRORTYPE;
+            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
         }
         else {
             $$.type = BOOLEAN;
@@ -1564,6 +1592,10 @@ EXPR21: EXPR2 EQUAL EXPR2
         if($1.type == ERRORTYPE || $3.type == ERRORTYPE){
             $$.type = ERRORTYPE;
         }
+        else if($1.type == NULLVOID || $3.type == NULLVOID){
+            $$.type = ERRORTYPE;
+            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
+        }
         else{
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());     
@@ -1578,6 +1610,10 @@ EXPR21: EXPR2 EQUAL EXPR2
         if($1.type == ERRORTYPE || $3.type == ERRORTYPE){
             $$.type = ERRORTYPE;
         }
+        else if($1.type == NULLVOID || $3.type == NULLVOID){
+            $$.type = ERRORTYPE;
+            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
+        }
         else{
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());     
@@ -1591,6 +1627,10 @@ EXPR21: EXPR2 EQUAL EXPR2
     {
         if($1.type == ERRORTYPE || $3.type == ERRORTYPE){
             $$.type = ERRORTYPE;
+        }
+        else if($1.type == NULLVOID || $3.type == NULLVOID){
+            $$.type = ERRORTYPE;
+            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
         }
         else{
             $$.type = BOOLEAN;
@@ -1607,6 +1647,10 @@ EXPR21: EXPR2 EQUAL EXPR2
             $$.type = ERRORTYPE;
             errorFound = true;
         }
+        else if($1.type == NULLVOID || $3.type == NULLVOID){
+            $$.type = ERRORTYPE;
+            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
+        }
         else{
             $$.type = BOOLEAN;
             $$.registerName = new string(tempSet.getRegister());     
@@ -1620,6 +1664,10 @@ EXPR21: EXPR2 EQUAL EXPR2
     {
         if($1.type == ERRORTYPE || $3.type == ERRORTYPE){
             $$.type = ERRORTYPE;
+        }
+        else if($1.type == NULLVOID || $3.type == NULLVOID){
+            $$.type = ERRORTYPE;
+            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
         }
         else{
             $$.type = BOOLEAN;
@@ -1637,15 +1685,17 @@ EXPR21: EXPR2 EQUAL EXPR2
             errorFound = true;
         }
         else{
-            $$.registerName = new string(*($1.registerName)); 
-            delete $1.registerName; 
+            if($1.type != NULLVOID){
+                $$.registerName = new string(*($1.registerName)); 
+                delete $1.registerName; 
+            }
         }    
     }
 ;
 
 EXPR2:  EXPR2 PLUS TERM
     {
-      if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
+        if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
             $$.type = ERRORTYPE; 
             errorFound = true; 
         }
@@ -1679,6 +1729,7 @@ EXPR2:  EXPR2 PLUS TERM
                 tempSet.freeRegister(*($3.registerName));   
             }
             else {
+                cout << "Line no. " << yylineno << ":  ";
                 cout << "Type mismatch in expression" << endl;
                 $$.type = ERRORTYPE;
             }
@@ -1720,6 +1771,7 @@ EXPR2:  EXPR2 PLUS TERM
                 tempSet.freeRegister(*($3.registerName));   
             }
             else {
+                cout << "Line no. " << yylineno << ":  ";
                 cout << "Type mismatch in expression" << endl;
                 $$.type = ERRORTYPE;
             }
@@ -1732,8 +1784,10 @@ EXPR2:  EXPR2 PLUS TERM
             errorFound = true;
         }
         else {
-            $$.registerName = new string(*($1.registerName)); 
-            delete $1.registerName;
+            if($1.type!= NULLVOID){
+                $$.registerName = new string(*($1.registerName)); 
+                delete $1.registerName;
+            }         
         } 
     }
 ;
@@ -1773,6 +1827,7 @@ TERM: TERM MUL FACTOR
                 tempSet.freeRegister(*($3.registerName));   
             }
             else {
+                cout << "Line no. " << yylineno << ":  ";
                 cout << "Type mismatch in expression" << endl;
                 $$.type = ERRORTYPE;
             }
@@ -1813,6 +1868,7 @@ TERM: TERM MUL FACTOR
                 tempSet.freeRegister(*($3.registerName));   
             }
             else {
+                cout << "Line no. " << yylineno << ": ";
                 cout << "Type mismatch in expression" << endl;
                 $$.type = ERRORTYPE;
             }
@@ -1821,7 +1877,7 @@ TERM: TERM MUL FACTOR
     | TERM MOD FACTOR
     {
         if ($1.type == ERRORTYPE || $3.type == ERRORTYPE) {
-        $$.type = ERRORTYPE;  
+            $$.type = ERRORTYPE;  
         }
         else {
             if ($1.type == INTEGER && $3.type == INTEGER) {
@@ -1833,6 +1889,7 @@ TERM: TERM MUL FACTOR
                 tempSet.freeRegister(*($3.registerName));   
             }
             else {
+                cout << "Line no. " << yylineno << ": ";
                 cout << "Type mismatch in expression" << endl;
                 $$.type = ERRORTYPE;
             }
@@ -1845,8 +1902,10 @@ TERM: TERM MUL FACTOR
             errorFound = true;
         }
         else {
-            $$.registerName = new string(*($1.registerName)); 
-            delete $1.registerName;
+            if($1.type != NULLVOID){
+                $$.registerName = new string(*($1.registerName)); 
+                delete $1.registerName;
+            }  
         } 
     }
 ;
@@ -1854,26 +1913,30 @@ TERM: TERM MUL FACTOR
 FACTOR: ID_ARR  
     { 
         $$.type = $1.type;
-        if ($$.type == INTEGER)
-            $$.registerName = new string(tempSet.getRegister());
-        else $$.registerName = new string(tempSet.getFloatRegister());
-        string s = (*($$.registerName)) + " = " + (*($1.registerName)) ;
-        gen(functionInstruction, s, nextquad);
-        if($1.offsetRegName != NULL){
-            tempSet.freeRegister((*($1.offsetRegName)));
+        if ($$.type != ERRORTYPE) {
+            if ($$.type == INTEGER)
+                $$.registerName = new string(tempSet.getRegister());
+            else $$.registerName = new string(tempSet.getFloatRegister());
+            string s = (*($$.registerName)) + " = " + (*($1.registerName)) ;
+            gen(functionInstruction, s, nextquad);
+            if($1.offsetRegName != NULL){
+                tempSet.freeRegister((*($1.offsetRegName)));
+            }
         }
     }
     | MINUS ID_ARR
     {
         $$.type = $2.type;
-        if ($$.type == INTEGER)
-            $$.registerName = new string(tempSet.getRegister());
-        else $$.registerName = new string(tempSet.getFloatRegister());
-        string s = (*($$.registerName)) + " = -" + (*($2.registerName)) ;
-        gen(functionInstruction, s, nextquad);
-        if($2.offsetRegName != NULL){
-            tempSet.freeRegister((*($2.offsetRegName)));
-        }
+        if($2.type != ERRORTYPE){
+            if ($$.type == INTEGER)
+                $$.registerName = new string(tempSet.getRegister());
+            else $$.registerName = new string(tempSet.getFloatRegister());
+            string s = (*($$.registerName)) + " = -" + (*($2.registerName)) ;
+            gen(functionInstruction, s, nextquad);
+            if($2.offsetRegName != NULL){
+                tempSet.freeRegister((*($2.offsetRegName)));
+            }
+        }        
     }
     | MINUS NUMINT
     {
@@ -1907,10 +1970,15 @@ FACTOR: ID_ARR
     | FUNC_CALL 
     { 
         $$.type = $1.type; 
-        if($1.type != ERRORTYPE && $1.type != NULLVOID){
-            $$.registerName = $1.registerName;
-            delete callFuncPtr;
-        }
+        if ($1.type == ERRORTYPE) {
+            if ($1.type == NULLVOID){
+                delete callFuncPtr;
+            }
+            else {
+                $$.registerName = $1.registerName;
+                delete callFuncPtr;
+            }
+        }; 
     }
     | LP ASG RP 
     { 
@@ -1939,7 +2007,8 @@ FACTOR: ID_ARR
         }
         else {
             $$.type = ERRORTYPE;
-            cout << "Cannot increment non-integer type variable" << endl; 
+            cout << "Line no. " << yylineno << ": ";
+            cout << "Cannot increment non-integer type variable "<< *($1.registerName) << endl; 
         }
     } 
     | ID_ARR DECREMENT
@@ -1962,6 +2031,7 @@ FACTOR: ID_ARR
         }
         else {
             $$.type = ERRORTYPE;
+            cout << "Line no. " << yylineno << ": ";
             cout << "Cannot increment non-integer type variable " << *($1.registerName) << endl; 
         }
     } 
@@ -1985,7 +2055,8 @@ FACTOR: ID_ARR
         }
         else {
             $$.type = ERRORTYPE;
-            cout << "Cannot increment non-integer type variable" << endl; 
+            cout << "Line no. " << yylineno << ": ";
+            cout << "Cannot increment non-integer type variable "<<*($2.registerName) << endl; 
         }
     } 
     | DECREMENT ID_ARR
@@ -2008,7 +2079,8 @@ FACTOR: ID_ARR
         }
         else {
             $$.type = ERRORTYPE;
-            cout << "Cannot increment non-integer type variable" << endl; 
+            cout << "Line no. " << yylineno << ": ";
+            cout << "Cannot increment non-integer type variable " << *($2.registerName) << endl; 
         }
     }
 ;
@@ -2029,11 +2101,13 @@ ID_ARR: ID
             }
             else {
                 $$.type = ERRORTYPE;
-                cout << $1 << " is declared as an array" << endl; 
+                cout << "Line no. " << yylineno << ":  ";
+                cout << $1 << " is declared as an array but is being used as a singleton" << endl; 
             }
         }
         else {
-            searchParam(string ($1), activeFuncPtr->parameterList, found, vn);
+            if (activeFuncPtr != NULL)
+                searchParam(string ($1), activeFuncPtr->parameterList, found, vn);
             if (found) {
                 if (vn->type == SIMPLE) {
                     $$.type = vn->eleType;
@@ -2043,11 +2117,13 @@ ID_ARR: ID
                 }
                 else {
                     $$.type = ERRORTYPE;
-                    cout << $1 << " is declared as an array" << endl;
+                    cout << "Line no. " << yylineno << ": ";
+                    cout << $1 << " is declared as an array but is being used as a singleton" << endl;
                 }
             }
             else {
                 $$.type = ERRORTYPE;
+                cout << "Line no. " << yylineno << ": ";
                 cout << "Undeclared identifier " << $1 << endl;
             }
         }
@@ -2097,49 +2173,20 @@ ID_ARR: ID
                     }
                     else {
                         $$.type = ERRORTYPE;
+                        cout << "Line no. " << yylineno << ": ";
                         cout << "Dimension mismatch: " << $1 << " should have " << dimlist.size() <<" dimensions" << endl;
                     }
                 }
                 else {
                     $$.type = ERRORTYPE;
-                    cout << $1 << " is declared as a singleton" << endl; 
+                    cout << "Line no. " << yylineno << ": ";
+                    cout << $1 << " is declared as a singleton but is being used as an array" << endl; 
                 }
             }
             else {
                 $$.type = ERRORTYPE;
+                cout << "Line no. " << yylineno << ": ";
                 cout << "Undeclared identifier " << $1 << endl;
-                // searchParam(string ($1), activeFuncPtr->parameterList, found, vn);
-                // if (found) {
-                //     if (vn->type == ARRAY) {
-                //         if (dimlist.size() == vn->dimlist.size()) {
-                //             $$.type = vn->eleType;
-                //             // calculate linear address using dimensions then pass to FACTOR
-                //             int offset = 0;
-                //             for (int i = 0; i < vn->dimlist.size(); i++) {
-                //                 offset += dimlist[i];
-                //                 if (i != vn->dimlist.size()-1) offset *= vn->dimlist[i+1];  
-                //             }
-                //             string os = to_string(offset);
-                //             string dataType = eletypeMapper($$.type);
-                //             dataType += "_" + to_string(vn->scope);
-                //             string s = "_" + string($1) + "_" + dataType;
-                //             // string s = string($1) + "[" + os + "]";
-                //             $$.registerName = new string(s); 
-                //         }
-                //         else {
-                //             $$.type = ERRORTYPE;
-                //             cout << "Dimension mismatch: " << $1 << " should have " << dimlist.size() << " dimensions" << endl;
-                //         }
-                //     }
-                //     else {
-                //         $$.type = ERRORTYPE;
-                //         cout << $1 << " is declared as a singleton" << endl;
-                //     }
-                // }
-                // else {
-                //     $$.type = ERRORTYPE;
-                //     cout << "Undeclared identifier " << $1 << endl;
-                // }
             }
             dimlist.clear();
         }
@@ -2152,6 +2199,7 @@ BR_DIMLIST: LSB ASG RSB
             dimlist.push_back(*($2.registerName));
         }
         else {
+            cout << "Line no. " << yylineno << ": ";
             cout << "One of the dimension of an array cannot be evaluated to integer" << endl;
         }
     }   
@@ -2161,6 +2209,7 @@ BR_DIMLIST: LSB ASG RSB
             dimlist.push_back(*($3.registerName));
         }
         else {
+            cout << "Line no. " << yylineno << ": ";
             cout << "One of the dimension of an array cannot be evaluated to integer" << endl;
         }  
     }
@@ -2170,7 +2219,7 @@ BR_DIMLIST: LSB ASG RSB
 
 void yyerror(char *s)
 {      
-    // printf( "\nSyntax error %s at line %d\n", s, yylineno);
+    // cout << "Line no. " << yylineno << ": Syntax error" << endl;
     // fflush(stdout);
 }
 
@@ -2193,7 +2242,7 @@ int main(int argc, char **argv)
             outinter<<it<<endl;
         }
     } else {
-        cout<<"exited without intermediate code generation"<<endl;
+        cout << "Exited without intermediate code generation" << endl;
     }
     outinter.close();
 }

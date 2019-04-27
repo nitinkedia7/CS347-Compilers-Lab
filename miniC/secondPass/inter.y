@@ -304,7 +304,7 @@ FLOATASG: USERVAR ASSIGN REGFLOAT
         fprintf(mips,"li $s1, %d\n", offset);
         fprintf(mips,"addu $s0, $sp, $s1\n");
         fprintf(mips,"sub $s0, $s0, $t%s\n", $3+1);
-        fprintf(mips,"sw $t%s, 0($s0)\n", $6+1);
+        fprintf(mips,"s.s $f%s, 0($s0)\n", $6+1);
     }
     | REGFLOAT ASSIGN USERVAR
     {

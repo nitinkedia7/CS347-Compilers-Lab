@@ -118,12 +118,13 @@ void searchFunc(funcEntry* activeFuncPtr, vector<funcEntry*> &funcEntryRecord, i
     return;  
 }
 
-void compareFunc(funcEntry* &activeFuncPtr, vector<funcEntry*> &funcEntryRecord, int &found){
+void compareFunc(funcEntry* &callFuncPtr, vector<funcEntry*> &funcEntryRecord, int &found){
+    
     for(auto it:funcEntryRecord){
-        if(it->name == activeFuncPtr->name  && it->numOfParam == activeFuncPtr->numOfParam){
+        if(it->name == callFuncPtr->name  && it->numOfParam == callFuncPtr->numOfParam){
             int flag=1;
             for(int i=0;i<it->numOfParam;i++){
-                if((it->parameterList[i])->eleType != activeFuncPtr->parameterList[i]->eleType){
+                if((it->parameterList[i])->eleType != callFuncPtr->parameterList[i]->eleType){
                     found=-1;
                     flag=0;
                     break;
@@ -131,7 +132,7 @@ void compareFunc(funcEntry* &activeFuncPtr, vector<funcEntry*> &funcEntryRecord,
             }
             if(flag == 1){
                 found=1;
-                activeFuncPtr->returnType = it->returnType;
+                callFuncPtr->returnType = it->returnType;
                 return;
             } 
         }

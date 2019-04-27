@@ -37,7 +37,7 @@ void registerSet::freeRegister(string s){
                 return;
             }
         }
-        cout<<"FLoat Register Freed "<< s <<endl;
+        // cout<<"FLoat Register Freed "<< s <<endl;
         floatRegister.push_back(x);
     } else if(s[0] == 'T'){
         s[0] = '0';
@@ -48,7 +48,7 @@ void registerSet::freeRegister(string s){
                 return;
             }
         }
-        cout<<"Int Register Freed "<< s <<endl;
+        // cout<<"Int Register Freed "<< s <<endl;
         tempRegister.push_back(x);
     } else {
         cout << "Not a Temp Variable : " << s << endl;
@@ -58,7 +58,7 @@ void registerSet::freeRegister(string s){
 void gen(vector<string> &functionInstruction, string instruction, int &nextQuad){
     functionInstruction.push_back(instruction);
     nextQuad++;
-    cout<<instruction<<endl;
+    // cout<<instruction<<endl;
     return;
 }
 
