@@ -90,7 +90,9 @@ MAIN_PROG: PROG MAINFUNCTION
 ;
 
 PROG: PROG FUNC_DEF
+    | PROG VAR_DECL
     | FUNC_DEF
+    | VAR_DECL
 ;
 
 MAINFUNCTION: MAIN_HEAD LCB BODY RCB
@@ -160,21 +162,26 @@ FUNC_HEAD: RES_ID LP DECL_PLIST RP
             gen(functionInstruction, s, nextquad);
         }
     }
-;
+; 
 
-RES_ID: RESULT ID       
+RES_ID: T ID       
     {   
         scope=1;
         activeFuncPtr = new funcEntry;
         activeFuncPtr->name = string($2);
         activeFuncPtr->returnType = resultType;
     } 
+    | VOID ID
+    {
+        scope=1;
+        activeFuncPtr = new funcEntry;
+        activeFuncPtr->name = string($2);
+        activeFuncPtr->returnType = NULLVOID;
+    }
 ;
 
-RESULT: INT  { resultType = INTEGER;  }
-    | FLOAT  { resultType = FLOATING; }
-    | VOID   { resultType = NULLVOID; }
-;
+
+
 
 DECL_PLIST: DECL_PL
     | %empty
@@ -418,7 +425,13 @@ VAR_DECL: D SEMI
 D: T L
     { 
         patchDataType(resultType, typeRecordList, scope);
-        insertSymTab(typeRecordList, activeFuncPtr);
+        if(scope > 1){
+            insertSymTab(typeRecordList, activeFuncPtr);
+            
+        }
+        else if(scope == 0){
+            insertGlobalVariables(typeRecordList, globalVariables);
+        }
         typeRecordList.clear();
     }
 ;
@@ -435,7 +448,8 @@ DEC_ID_ARR: ID
     {   
         int found = 0;
         typeRecord* vn = NULL;
-        if(activeFuncPtr!=NULL){
+        // cout << "Scope : "<<scope<<endl;
+        if(activeFuncPtr!=NULL && scope > 0){
             searchVariable(string($1), activeFuncPtr, found, vn, scope);
             if (found) {
                 if(vn->isValid==true){
@@ -486,7 +500,25 @@ DEC_ID_ARR: ID
                 varRecord->maxDimlistOffset=1;
                 typeRecordList.push_back(varRecord);
             }
-        } else {
+        }
+        else if(scope == 0){
+            searchGlobalVariable(string($1), globalVariables, found, vn, scope);
+            if (found) {
+                printf("Variable %s already declared at global level \n", $1);
+            }
+            else{
+                varRecord = new typeRecord;
+                varRecord->name = string($1);
+                varRecord->type = SIMPLE;
+                varRecord->tag = VARIABLE;
+                varRecord->scope = scope;
+                varRecord->isValid=true;
+                varRecord->maxDimlistOffset=1;
+                // cout<<"variable name: "<<varRecord->name<<endl;
+                typeRecordList.push_back(varRecord);   
+            }
+        } 
+        else {
             errorFound = true;
         }
         
@@ -583,7 +615,12 @@ DEC_ID_ARR: ID
                     tempSet.freeRegister(registerName);
                 }   
             }
-        } else {
+        }
+        else if(scope == 0){
+            printf("ID assignments not allowed in global level : Variable %s \n", $1);
+            errorFound = true;
+        }
+        else {
             errorFound = true;
         }
     }
@@ -665,8 +702,35 @@ DEC_ID_ARR: ID
                 varRecord->maxDimlistOffset = a;
                 typeRecordList.push_back(varRecord);
             }
-            decdimlist.clear();  
-        }    
+            // decdimlist.clear();  
+        } 
+        else if(scope == 0){
+            typeRecord* vn = NULL;
+            searchGlobalVariable(string($1), globalVariables, found, vn, scope);
+            if (found) {
+                printf("Variable %s already declared at global level \n", $1);
+            }
+            else{
+                varRecord = new typeRecord;
+                varRecord->name = string($1);
+                varRecord->type = ARRAY;
+                varRecord->tag = VARIABLE;
+                varRecord->scope = scope;
+                varRecord->dimlist = decdimlist;
+                varRecord->isValid=true;
+                int a=1;
+                for(auto it : decdimlist){
+                    a*=(it);
+                }
+                varRecord->maxDimlistOffset = a;
+                // cout<<"variable name: "<<varRecord->name<<endl;
+                typeRecordList.push_back(varRecord);   
+            }
+        }   
+        else{
+            errorFound = 1;
+        }
+        decdimlist.clear();
     }
 ;
 
@@ -2051,10 +2115,10 @@ FACTOR: ID_ARR
 
 ID_ARR: ID
     {   
-        // retrieve the highest level id with same name in param list or var list
+        // retrieve the highest level id with same name in param list or var list or global list
         int found = 0;
         typeRecord* vn = NULL;
-        searchCallVariable(string($1), activeFuncPtr, found, vn); 
+        searchCallVariable(string($1), activeFuncPtr, found, vn, globalVariables); 
         $$.offsetRegName = NULL;
         if(found){
             if (vn->type == SIMPLE) {
@@ -2103,7 +2167,7 @@ ID_ARR: ID
             $$.type = ERRORTYPE;
         }
         else{
-            searchCallVariable(string($1), activeFuncPtr, found, vn); 
+            searchCallVariable(string($1), activeFuncPtr, found, vn, globalVariables); 
             if(found){
                 if (vn->type == ARRAY) {
                     if (dimlist.size() == vn->dimlist.size()) {
@@ -2166,7 +2230,7 @@ BR_DIMLIST: LSB ASG RSB
             cout << "Line no. " << yylineno << ": ";
             cout << "One of the dimension of an array cannot be evaluated to integer" << endl;
         }
-    }   
+    }    
     | BR_DIMLIST LSB ASG RSB 
     {
         if ($3.type == INTEGER) {
@@ -2199,7 +2263,7 @@ int main(int argc, char **argv)
     dimlist.clear();
     
     yyparse();
-    populateOffsets(funcEntryRecord);
+    populateOffsets(funcEntryRecord, globalVariables);
     ofstream outinter;
     outinter.open("./output/intermediate.txt");
     if(!errorFound){

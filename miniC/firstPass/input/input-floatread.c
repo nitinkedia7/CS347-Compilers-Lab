@@ -13,7 +13,8 @@ int main(){
     if(n <= 0){
         return 0;
     }
-    int i = min(n,10)-1;
+    int i;
+    i = min(n,10)-1;
     while(i--){
         read arr[i];
     }

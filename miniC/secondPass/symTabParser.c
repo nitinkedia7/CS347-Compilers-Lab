@@ -30,7 +30,8 @@ eletype getEleType(string x){
         return NULLVOID;
     return ERRORTYPE;
 }
-int getOffset(vector<funcEntry> &functionList,string functionName, string variableName, int internalOffset){
+int getOffset(vector<funcEntry> &functionList, vector<typeRecord> &globalVariables, string functionName, string variableName, int internalOffset, bool &isGlobal){
+    isGlobal = false;
     for(auto it : functionList){
         if(it.name == functionName){
             for (auto it2 : it.variableList){
@@ -47,6 +48,12 @@ int getOffset(vector<funcEntry> &functionList,string functionName, string variab
             }
         }
     }   
+    for(auto it : globalVariables){
+        if(it.name == variableName){
+            isGlobal = true;
+            return 0;
+        }
+    }
     cout << "Variable " << variableName << " not found in " << functionName << endl;
     return -1;
 }
@@ -78,30 +85,56 @@ void printVector(vector<funcEntry> &functionprintList){
     }
 }
 
-void readSymbolTable(vector<funcEntry> &functionList){
+void readSymbolTable(vector<funcEntry> &functionList, vector<typeRecord> &globalVariables){
     ifstream myfile;
     myfile.open ("../firstPass/output/symtab.txt");
     string a;
+    bool isGlobal = false;
     while(myfile >> a){
         if(a=="$$"){
             // cout<<"pp "<<a<<endl;
             funcEntry p;
             myfile >> p.name;
+            if(p.name == "GLOBAL"){
+                isGlobal = true;
+            }
+            else{
+                isGlobal = false;
+            }
             string x;
             myfile >> x;
             p.returnType = getEleType(x);
             myfile >> p.numOfParam;
             myfile >> p.functionOffset;
             myfile >> x;
-            (p.parameterList).resize(p.numOfParam);
-            for(int i=0;i<p.numOfParam;i++){
-                p.parameterList[i] = new typeRecord;
-                myfile >> (p.parameterList[i])->name;
-                string t;
-                myfile >> t;
-                (p.parameterList[i])->eleType= getEleType(t);
-                myfile >> (p.parameterList[i])->scope;
-                myfile >> (p.parameterList[i])->varOffset; 
+            if(isGlobal){
+                // globalVariables.insert(globalVariables.end(), p.parameterList.begin(), p.parameterList.end());
+                for(int i=0;i<p.numOfParam;i++){
+                    typeRecord newType;
+                    string eleType;
+                    myfile >> newType.name;
+                    myfile >> eleType;
+                    newType.eleType = getEleType(eleType);
+                    
+                    myfile >> newType.scope;
+                    myfile >> newType.varOffset;
+                    globalVariables.push_back(newType);
+                }
+                for(auto it : globalVariables){
+                    cout << "Global Variable Name : "<< it.name << endl;
+                }
+            }
+            else{
+                (p.parameterList).resize(p.numOfParam);
+                for(int i=0;i<p.numOfParam;i++){
+                    p.parameterList[i] = new typeRecord;
+                    myfile >> (p.parameterList[i])->name;
+                    string t;
+                    myfile >> t;
+                    (p.parameterList[i])->eleType= getEleType(t);
+                    myfile >> (p.parameterList[i])->scope;
+                    myfile >> (p.parameterList[i])->varOffset; 
+                }
             }
             myfile >> x;
             int z;
@@ -116,7 +149,9 @@ void readSymbolTable(vector<funcEntry> &functionList){
                 myfile >> (p.variableList[i])->scope;
                 myfile >> (p.variableList[i])->varOffset;
             }
-            functionList.push_back(p);
+            if(!isGlobal){
+                functionList.push_back(p);
+            }
         }
     }
 }
@@ -129,3 +164,4 @@ int getParamOffset(vector<funcEntry> &functionList, string functionName){
     } 
     return 0;
 }
+

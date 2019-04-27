@@ -30,7 +30,7 @@ int eletypeIntMapper(eletype a);
 eletype getEleType(string x);
 
 int getParamOffset(vector<funcEntry> &functionList, string functionName);
-void readSymbolTable(vector<funcEntry> &functionList);
-int getOffset(vector<funcEntry> &functionList, string functionName, string variableName, int internalOffset);
+void readSymbolTable(vector<funcEntry> &functionList, vector<typeRecord> &globalVariables);
+int getOffset(vector<funcEntry> &functionList, vector<typeRecord> &globalVariables, string functionName, string variableName, int internalOffset, bool &isGlobal);
 int getFunctionOffset(vector<funcEntry> &functionList, string functionName);
 void printVector(vector<funcEntry> &functionList);
