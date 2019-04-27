@@ -24,9 +24,11 @@ int paramOffset;
 string returnVal;
 int floatLabel = 0;
 vector<funcEntry> functionList;
+vector<typeRecord> globalVariables;
 
 void saveRegisters(int frameSize);
-void retrieveRegisters(int frameSize);    
+void retrieveRegisters(int frameSize);  
+bool isGlobal;  
 %}
 
 %union {
@@ -89,7 +91,9 @@ STMT: ASG
         saveRegisters(frameSize+paramOffset);       // Save all temp registers
         fprintf(mips, "jal %s\n", $2);                     // jal calling
         retrieveRegisters(frameSize+paramOffset);   // retrieve all registers
-        if(returnVal[0] == 'F'){
+        if(returnVal==""){
+
+        } else if(returnVal[0] == 'F'){
             fprintf(mips, "move $s0, $v0\n");   // move result to refparam
             fprintf(mips, "mtc1 $s0, $f%s\n", returnVal.c_str()+1);   // move result to refparam
         } else {
@@ -98,6 +102,7 @@ STMT: ASG
         int funcParamOffset = getParamOffset(functionList, string($2));
         fprintf(mips, "add $sp, $sp, %d\n", funcParamOffset);  // collapse space used by parameters
         paramOffset-=funcParamOffset;
+        returnVal = "";
     }
     | FUNCTION BEG USERVAR 
     {
@@ -171,40 +176,64 @@ STMT: ASG
 
 ASG: USERVAR ASSIGN REGINT
     {
-        int offset = getOffset(functionList,activeFunc, string($1), 0)+paramOffset;
-        fprintf(mips, "sw $t%c, %d($sp)\n", $3[1], offset);
+        int offset = getOffset(functionList, globalVariables, activeFunc, string($1), 0, isGlobal)+paramOffset;
+        if(!isGlobal){
+            fprintf(mips, "sw $t%c, %d($sp)\n", $3[1], offset);
+        } else {
+            fprintf(mips, "sw $t%s, %s\n", $3+1, $1); 
+        }
     }
     | USERVAR LSB NUMINT RSB ASSIGN REGINT
     {
-        int offset = getOffset(functionList,activeFunc, string($1), 0)+paramOffset;
+        // useless
+        int offset = getOffset(functionList, globalVariables, activeFunc, string($1), 0, isGlobal)+paramOffset;
         fprintf(mips, "sw $t%c, %d($sp)\n", $3[1], offset);
     }
     | USERVAR LSB REGINT RSB ASSIGN REGINT
     {
-        int offset = getOffset(functionList,activeFunc, string($1), 0)+paramOffset;
-        fprintf(mips, "mul $t%s, $t%s, %d\n", $3+1, $3+1, INTSIZE);
-        fprintf(mips,"li $s1, %d\n", offset);
-        fprintf(mips,"addu $s0, $sp, $s1\n");
-        fprintf(mips,"sub $s0, $s0, $t%s\n", $3+1);
-        fprintf(mips,"sw $t%s, 0($s0)\n", $6+1);
+        int offset = getOffset(functionList, globalVariables, activeFunc, string($1), 0, isGlobal)+paramOffset;
+        if(!isGlobal){
+            fprintf(mips, "mul $t%s, $t%s, %d\n", $3+1, $3+1, INTSIZE);
+            fprintf(mips,"li $s1, %d\n", offset);
+            fprintf(mips,"addu $s0, $sp, $s1\n");
+            fprintf(mips,"sub $s0, $s0, $t%s\n", $3+1);
+            fprintf(mips,"sw $t%s, 0($s0)\n", $6+1);
+        } else {
+            fprintf(mips, "mul $t%s, $t%s, %d\n", $3+1, $3+1, INTSIZE);
+            fprintf(mips,"la $s1, %s\n", $1);
+            fprintf(mips,"addu $s0, $s1, $t%s\n", $3+1);
+            fprintf(mips,"sw $t%s, 0($s0)\n", $6+1);
+        }
     }
     | REGINT ASSIGN USERVAR
     {
-        int offset = getOffset(functionList,activeFunc, string($3), 0)+paramOffset;
-        fprintf(mips, "lw $t%c, %d($sp)\n", $1[1], offset);
+        int offset = getOffset(functionList, globalVariables, activeFunc, string($3), 0, isGlobal)+paramOffset;
+        if(!isGlobal){
+            fprintf(mips, "lw $t%c, %d($sp)\n", $1[1], offset);
+        } else {
+            fprintf(mips, "lw $t%c, %s\n", $1[1], $3);
+        }
     }
     | REGINT ASSIGN USERVAR LSB REGINT RSB
     {
-        int offset = getOffset(functionList,activeFunc, string($3), 0)+paramOffset;
-        fprintf(mips, "mul $t%s, $t%s, %d\n", $5+1, $5+1, INTSIZE);
-        fprintf(mips,"li $s1, %d\n", offset);
-        fprintf(mips,"addu $s0, $sp, $s1\n");
-        fprintf(mips,"sub $s0, $s0, $t%s\n", $5+1);
-        fprintf(mips,"lw $t%s, 0($s0)\n", $1+1);
+        int offset = getOffset(functionList, globalVariables, activeFunc, string($3), 0, isGlobal)+paramOffset;
+        if(!isGlobal){
+            fprintf(mips, "mul $t%s, $t%s, %d\n", $5+1, $5+1, INTSIZE);
+            fprintf(mips,"li $s1, %d\n", offset);
+            fprintf(mips,"addu $s0, $sp, $s1\n");
+            fprintf(mips,"sub $s0, $s0, $t%s\n", $5+1);
+            fprintf(mips,"lw $t%s, 0($s0)\n", $1+1);
+        } else {
+            fprintf(mips, "mul $t%s, $t%s, %d\n", $5+1, $5+1, INTSIZE);
+            fprintf(mips,"la $s0, %s\n", $3);
+            fprintf(mips,"addu $s0, $s0, $t%s\n", $3+1);
+            fprintf(mips,"lw $t%s, 0($s0)\n", $1+1);
+        }
     }
     | REGINT ASSIGN USERVAR LSB NUMINT RSB
     {
-        int offset = getOffset(functionList,activeFunc, string($3), 0)+paramOffset;
+        //useless
+        int offset = getOffset(functionList, globalVariables, activeFunc, string($3), 0, isGlobal)+paramOffset;
         fprintf(mips, "sw $t%c, %d($sp)\n", $1[1], offset);
     }
     | REGINT ASSIGN NUMINT
@@ -289,34 +318,57 @@ ASG: USERVAR ASSIGN REGINT
 
 FLOATASG: USERVAR ASSIGN REGFLOAT
     {
-        int offset = getOffset(functionList, activeFunc, string($1), 0)+paramOffset;
-        fprintf(mips, "s.s $f%s, %d($sp)\n", $3+1, offset);
+        int offset = getOffset(functionList, globalVariables, activeFunc, string($1), 0, isGlobal)+paramOffset;
+        if(!isGlobal){
+            fprintf(mips, "s.s $f%s, %d($sp)\n", $3+1, offset);
+        } else {
+            fprintf(mips, "s.s $f%s, %s\n", $3+1, $1);
+        }
     }
     | USERVAR LSB NUMINT RSB ASSIGN REGFLOAT
     {
-        int offset = getOffset(functionList, activeFunc, string($1), 0)+paramOffset;
+        //useless
+        int offset = getOffset(functionList, globalVariables, activeFunc, string($1), 0, isGlobal)+paramOffset;
         fprintf(mips, "s.s $f%s, %d($sp)\n", $3+1, offset);
     }
     | USERVAR LSB REGINT RSB ASSIGN REGFLOAT
     {
-        int offset = getOffset(functionList,activeFunc, string($1), 0)+paramOffset;
-        fprintf(mips, "mul $t%s, $t%s, %d\n", $3+1, $3+1, INTSIZE);
-        fprintf(mips,"li $s1, %d\n", offset);
-        fprintf(mips,"addu $s0, $sp, $s1\n");
-        fprintf(mips,"sub $s0, $s0, $t%s\n", $3+1);
-        fprintf(mips,"sw $t%s, 0($s0)\n", $6+1);
+        int offset = getOffset(functionList, globalVariables, activeFunc, string($1), 0, isGlobal)+paramOffset;
+        if(!isGlobal){
+            fprintf(mips, "mul $t%s, $t%s, %d\n", $3+1, $3+1, INTSIZE);
+            fprintf(mips,"li $s1, %d\n", offset);
+            fprintf(mips,"addu $s0, $sp, $s1\n");
+            fprintf(mips,"sub $s0, $s0, $t%s\n", $3+1);
+            fprintf(mips,"s.s $f%s, 0($s0)\n", $6+1);
+        } else {
+            fprintf(mips, "mul $t%s, $t%s, %d\n", $3+1, $3+1, INTSIZE);
+            fprintf(mips,"la $s1, %s\n", $1);
+            fprintf(mips,"addu $s0, $s1, $t%s\n", $3+1);
+            fprintf(mips,"s.s $f%s, 0($s0)\n", $6+1);
+        }
     }
     | REGFLOAT ASSIGN USERVAR
     {
-        int offset = getOffset(functionList, activeFunc, string($3), 0)+paramOffset;
-        fprintf(mips, "l.s $f%s, %d($sp)\n", $1+1, offset);
+        int offset = getOffset(functionList, globalVariables, activeFunc, string($3), 0, isGlobal)+paramOffset;
+        if(!isGlobal){
+            fprintf(mips, "l.s $f%s, %d($sp)\n", $1+1, offset);
+        } else {
+            fprintf(mips, "l.s $f%s, %s\n", $1+1, $3);
+        }
     }
     | REGFLOAT ASSIGN USERVAR LSB REGINT RSB
     {
-        int offset = getOffset(functionList, activeFunc, string($3), 0)+paramOffset;
-        fprintf(mips, "mul $t%s, $t%s, %d\n", $5+1, $5+1, INTSIZE);
-        fprintf(mips, "subu $s0, $sp, $t%s\n", $5+1);
-        fprintf(mips, "l.s $f%s, %d($s0)\n", $1+1, offset);
+        int offset = getOffset(functionList, globalVariables, activeFunc, string($3), 0, isGlobal)+paramOffset;
+        if(!isGlobal){
+            fprintf(mips, "mul $t%s, $t%s, %d\n", $5+1, $5+1, INTSIZE);
+            fprintf(mips, "subu $s0, $sp, $t%s\n", $5+1);
+            fprintf(mips, "l.s $f%s, %d($s0)\n", $1+1, offset);
+        } else {
+            fprintf(mips, "mul $t%s, $t%s, %d\n", $5+1, $5+1, INTSIZE);
+            fprintf(mips,"la $s1, %s\n", $3);
+            fprintf(mips,"addu $s0, $s1, $t%s\n", $5+1);
+            fprintf(mips,"l.s $f%s, 0($s0)\n", $1+1);
+        }
     }
     | REGFLOAT ASSIGN CONVERTFLOAT LP REGINT RP
     {
@@ -512,12 +564,17 @@ void yyerror(char *s)
 
 int main(int argc, char **argv)
 {
+    readSymbolTable(functionList, globalVariables);
+    returnVal = ""; 
+    isGlobal = false;
     mips = fopen("mips.s", "w");
     fflush(mips);
     fprintf(mips,".data\n");
+    for(auto it : globalVariables){
+        fprintf(mips, "%s: .space %d\n", it.name.c_str(), 4*(it.varOffset));
+    }
     fprintf(mips,"endline: .asciiz \"\\n\"\n");
     fprintf(mips,".text\n");
-    readSymbolTable(functionList);
     paramOffset = 0;
     floatLabel = 0;
     yyparse();

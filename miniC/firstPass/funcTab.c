@@ -16,6 +16,10 @@ void insertSymTab(vector<typeRecord*> &typeRecordList, funcEntry* activeFuncPtr)
     return;
 }
 
+void insertGlobalVariables(vector<typeRecord*> &typeRecordList, vector<typeRecord*> &globalVariables){
+    globalVariables.insert(globalVariables.end(), typeRecordList.begin(), typeRecordList.end());
+}
+
 void insertParamTab(vector<typeRecord*> &typeRecordList, funcEntry* activeFuncPtr) {
     if(activeFuncPtr == NULL) {
         return;
@@ -66,7 +70,23 @@ void searchVariable(string name, funcEntry* activeFuncPtr, int &found, typeRecor
     return;
 }
 
-void searchCallVariable(string name, funcEntry* activeFuncPtr, int &found, typeRecord *&vn) {
+void searchGlobalVariable(string name, vector<typeRecord*> &globalVariables, int &found, typeRecord *&vn, int scope){
+    bool flag=false;
+    for (auto it : globalVariables) {
+        if (name == it->name && it->scope==scope) {
+            // vn = *it;
+            flag=true;
+        }
+    }
+    if(flag){
+        found=1;
+        return;
+    }
+    found = 0;
+    vn = NULL;
+}
+
+void searchCallVariable(string name, funcEntry* activeFuncPtr, int &found, typeRecord *&vn, vector<typeRecord*> &globalVariables) {
     if(activeFuncPtr == NULL) {
         return;
     }
@@ -82,6 +102,17 @@ void searchCallVariable(string name, funcEntry* activeFuncPtr, int &found, typeR
             }
             flag=true;
             // return;
+        }
+    }
+    if(flag){
+        found=1;
+        return;
+    }
+    for(auto it : globalVariables){
+        if(name == it->name && it->isValid){
+            flag = true;
+            vn = it;
+            break;
         }
     }
     if(flag){
@@ -232,7 +263,7 @@ int TagMapper(Tag a){
     return 2;
 }
 
-void populateOffsets(vector<funcEntry*> &funcEntryRecord){
+void populateOffsets(vector<funcEntry*> &funcEntryRecord, vector<typeRecord*> &globalVariables){
     int offset;
     for(auto &funcRecord : funcEntryRecord){
         offset = 0;
@@ -249,13 +280,25 @@ void populateOffsets(vector<funcEntry*> &funcEntryRecord){
         }
         funcRecord->functionOffset = offset;
     }
-    printSymbolTable(funcEntryRecord);
+    printSymbolTable(funcEntryRecord, globalVariables);
 }
 
-void printSymbolTable(vector<funcEntry*> &funcEntryRecord){
+void printSymbolTable(vector<funcEntry*> &funcEntryRecord, vector<typeRecord*> &globalVariables){
     ofstream symbolTable;
     symbolTable.open("output/symtab.txt");
     symbolTable.flush();
+
+    // Printing Global Variables
+    symbolTable << "$$" << endl;
+    symbolTable << "GLOBAL " << "EMPTY " << globalVariables.size() << " 0 " << endl;
+    symbolTable << "$1" << endl;
+    for(auto &varRecord : globalVariables){
+        symbolTable << "_" << varRecord->name << "_" << eletypeMapper(varRecord->eleType) << "_" << varRecord->scope << " " << eletypeIntMapper(varRecord->eleType) << " " ;
+        symbolTable << varRecord->scope << " " << varRecord->maxDimlistOffset << endl;
+    }
+    symbolTable << "$2 0" << endl;
+
+    // Printing Local Function Variables
     for(auto &funcRecord : funcEntryRecord){
         symbolTable << "$$" << endl;
         if(funcRecord->name != "main"){
