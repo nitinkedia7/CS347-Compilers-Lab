@@ -12,7 +12,8 @@ int main(){
         default:
             c=2;
     }
-
+    print a;
+    print b;
     switch(a+b){
         case 1: a=2;break;
         case 2: b=1;

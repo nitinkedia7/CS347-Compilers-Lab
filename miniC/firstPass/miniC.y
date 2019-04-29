@@ -10,13 +10,14 @@
 #include "funcTab.h"
 #include "codegenHelpers.h"
 using namespace std;
+#define YYERROR_VERBOSE 1
 
 extern int yylex();
 extern int yyparse();
 extern int yylineno;
 extern char* yytext;
 extern int yyleng;
-void yyerror(char* s);
+void yyerror(const char* s);
 
 int offsetCalc;
 string text;
@@ -2315,9 +2316,10 @@ BR_DIMLIST: LSB ASG RSB
 
 %%
 
-void yyerror(char *s)
+void yyerror(const char *s)
 {      
     errorFound=1;
+    fprintf (stderr, "%s\n", s);
     // cout << "Line no. " << yylineno << ": Syntax error" << endl;
     // fflush(stdout);
 }
