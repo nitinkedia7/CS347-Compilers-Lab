@@ -565,6 +565,7 @@ void retrieveRegisters(int frameSize){
 void yyerror(char *s)
 {      
     printf("\nSyntax error %s at line %d\n", s, yylineno);
+    // cout << BOLD(FRED("Error : ")) << FYEL("Syntax error " + string(s) + "in intermediate code at line " + to_string(yylineno)) << endl;
     fflush(stdout);
 }
 

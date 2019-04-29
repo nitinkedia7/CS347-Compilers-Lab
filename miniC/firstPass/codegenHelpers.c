@@ -3,7 +3,8 @@
 string registerSet::getRegister() {
     string reg = "";
     if (tempRegister.size()==0) {
-        cout<<"Exceeded maximum temporary registers"<<endl;
+        cout << BOLD(FRED("FATAL ERROR : Exceeded maximum temporary Int registers")) << endl;
+        exit(1);
         return reg;
     }
     reg += "T";
@@ -16,7 +17,8 @@ string registerSet::getRegister() {
 string registerSet::getFloatRegister() {
     string reg = "";
     if (floatRegister.size()==0) {
-        cout<<"Exceeded maximum temporary registers"<<endl;
+        cout << BOLD(FRED("FATAL ERROR : Exceeded maximum temporary Float registers")) << endl;
+        exit(1);
         return reg;
     }
     reg += "F";
@@ -33,7 +35,7 @@ void registerSet::freeRegister(string s){
         int x = stoi(s);
         for(auto it : floatRegister){
             if(it==x){
-                cout<<"Float Register already free"<<s<<endl;
+                // cout<<"Trying to free an already freed Float Register "<<s<<endl;
                 return;
             }
         }
@@ -44,7 +46,7 @@ void registerSet::freeRegister(string s){
         int x = stoi(s);
         for(auto it:tempRegister){
             if(it==x){
-                cout<<"Int Register already free"<<s<<endl;
+                // cout<<"Trying to free an already freed Int Register "<<s<<endl;
                 return;
             }
         }

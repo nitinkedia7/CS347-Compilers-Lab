@@ -118,7 +118,7 @@ MAIN_HEAD: INT MAIN LP RP
         typeRecordList.clear();
         searchFunc(activeFuncPtr, funcEntryRecord, found);
         if (found) {
-            cout << "Line no. " << yylineno << ": Function " << activeFuncPtr->name <<  " already declared." << endl;
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": Function " << activeFuncPtr->name <<  " already declared." << endl;
             delete activeFuncPtr;
             activeFuncPtr = NULL;
         }   
@@ -146,10 +146,10 @@ FUNC_HEAD: RES_ID LP DECL_PLIST RP
         int found = 0;
         searchFunc(activeFuncPtr, funcEntryRecord, found);
         if(found){
-            cout << "Line no. " << yylineno << ": Function " << activeFuncPtr->name <<  " already declared." << endl;
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": Function " << activeFuncPtr->name <<  " already declared." << endl;
             errorFound = true;
             delete activeFuncPtr;
-            cout<<"Function head me activeFuncPtr deleted"<<endl;
+            // cout<<"Function head me activeFuncPtr deleted"<<endl;
         }   
         else{
             activeFuncPtr->numOfParam = typeRecordList.size();
@@ -193,7 +193,7 @@ DECL_PL: DECL_PL COMMA DECL_PARAM
         typeRecord* pn = NULL;
         searchParam(varRecord->name, typeRecordList, found, pn);
         if(found){
-            cout << "Line no. " << yylineno << ": Redeclaration of parameter " << varRecord->name <<endl;
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": Redeclaration of parameter " << varRecord->name <<endl;
         } else {
             // cout << "Variable: "<< varRecord->name << " declared." << endl;
             typeRecordList.push_back(varRecord);
@@ -206,7 +206,7 @@ DECL_PL: DECL_PL COMMA DECL_PARAM
         typeRecord* pn = NULL;
         searchParam(varRecord->name, typeRecordList, found , pn );
         if (found){
-            cout << "Line no. " << yylineno << ": Redeclaration of parameter " << varRecord->name <<endl;
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": Redeclaration of parameter " << varRecord->name <<endl;
         } else {
             // cout << "Variable: "<< varRecord->name << " declared." << endl;
             typeRecordList.push_back(varRecord);
@@ -334,10 +334,10 @@ STMT: VAR_DECL
         $$.continueList = new vector <int>;
         if ($2.type != ERRORTYPE && activeFuncPtr != NULL) {
             if (activeFuncPtr->returnType == NULLVOID && $2.type != NULLVOID) {
-                cout << "Line no. " << yylineno << ": function " << activeFuncPtr->name << " has void return type not " << $2.type << endl;
+                cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": function " << activeFuncPtr->name << " has void return type not " << $2.type << endl;
             }
             else if (activeFuncPtr->returnType != NULLVOID && $2.type == NULLVOID) {
-                cout << "Line no. " << yylineno << ": function " << activeFuncPtr->name << " has non-void return type" << endl;
+                cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": function " << activeFuncPtr->name << " has non-void return type" << endl;
             }
             else {
                 string s;
@@ -345,6 +345,7 @@ STMT: VAR_DECL
                     if ($2.type == INTEGER && activeFuncPtr->returnType == FLOATING)  {
                         string floatReg = tempSet.getFloatRegister();
                         s = floatReg + " = " + "convertToFloat(" + *($2.registerName) + ")";
+                        cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                         gen(functionInstruction, s, nextquad);
                         s = "return " + floatReg;
                         gen(functionInstruction, s, nextquad);
@@ -354,6 +355,7 @@ STMT: VAR_DECL
                     else if ($2.type == FLOATING && activeFuncPtr->returnType == INTEGER) {
                         string intReg = tempSet.getRegister();
                         s = intReg + " = " + "convertToInt(" + *($2.registerName) + ")";
+                        cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                         gen(functionInstruction, s, nextquad);
                         s = "return " + intReg;
                         gen(functionInstruction, s, nextquad);
@@ -372,7 +374,7 @@ STMT: VAR_DECL
                 }
                 else {
                     errorFound = 1;
-                    cout << "Line no. " << yylineno << ": Exactly one of function " << activeFuncPtr->name << "and this return statement has void return type" << endl;
+                    cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": Exactly one of function " << activeFuncPtr->name << "and this return statement has void return type" << endl;
                     if ($2.type != NULLVOID) tempSet.freeRegister(*($2.registerName));
                 } 
             }
@@ -433,7 +435,7 @@ STMT: VAR_DECL
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
-        cout << "Line no. " << yylineno << ": Syntax error" << endl;
+        cout << BOLD(FRED("ERROR : ")) << FYEL("Line no. " + to_string(yylineno) + ": Syntax error") << endl;
     }
     | error
     {
@@ -441,7 +443,7 @@ STMT: VAR_DECL
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
-        cout << "Line no. " << yylineno << ": Syntax error" << endl;
+        cout << BOLD(FRED("ERROR : ")) << FYEL("Line no. " + to_string(yylineno) + ": Syntax error") << endl;
     }
 ;
 
@@ -479,7 +481,7 @@ DEC_ID_ARR: ID
             searchVariable(string($1), activeFuncPtr, found, vn, scope);
             if (found) {
                 if(vn->isValid==true){
-                    printf("Line no. %d: Variable %s already declared at same level %d\n", yylineno, $1, scope);
+                    cout << BOLD(FRED("ERROR : ")) << "Line no. :" << yylineno << " Variable " << string($1) << " already declared at same level " << scope << endl ;
                 }
                 else{
                     if(vn->eleType == resultType){
@@ -503,7 +505,8 @@ DEC_ID_ARR: ID
                 typeRecord* pn = NULL;
                 searchParam(string($1), activeFuncPtr->parameterList, found , pn);
                 if (found) {
-                    printf("Line no. %d: Vaiable %s is already declared as a parameter with scope %d\n", yylineno, $1, scope);
+                    // printf("Line no. %d: Vaiable %s is already declared as a parameter with scope %d\n", yylineno, $1, scope);
+                    cout << BOLD(FRED("ERROR : ")) << "Line no. :" << yylineno << " Variable " << string($1) << " already declared in parameters " << endl ;
                 } 
                 else {
                     varRecord = new typeRecord;
@@ -530,7 +533,8 @@ DEC_ID_ARR: ID
         else if(scope == 0){
             searchGlobalVariable(string($1), globalVariables, found, vn, scope);
             if (found) {
-                printf("Variable %s already declared at global level \n", $1);
+                // printf("Variable %s already declared at global level \n", $1);
+                cout << BOLD(FRED("ERROR : ")) << "Line no. :" << yylineno << " Variable " << string($1) << " already declared at global level " << endl ;
             }
             else{
                 varRecord = new typeRecord;
@@ -558,7 +562,7 @@ DEC_ID_ARR: ID
             bool varCreated = false;;
             if (found) {
                 if(vn->isValid==true){
-                    printf("Line no. %d: Variable %s already declared at same level %d\n", yylineno, $1, scope);
+                    cout << BOLD(FRED("ERROR : ")) << "Line no. :" << yylineno << " Variable " << string($1) << " already declared at same level " << scope << endl ;
                 }
                 else{
                     if(vn->eleType == resultType){
@@ -584,7 +588,7 @@ DEC_ID_ARR: ID
                 typeRecord* pn = NULL;
                 searchParam(string($1), activeFuncPtr->parameterList, found , pn);
                 if (found) {
-                    printf("Line no. %d: Vaiable %s is already declared as a parameter with scope %d\n", yylineno, $1, scope);
+                    cout << BOLD(FRED("ERROR : ")) << "Line no. :" << yylineno << " Variable " << string($1) << " already declared at parameter level " << endl ;
                 } 
                 else {
                     varRecord = new typeRecord;
@@ -614,7 +618,7 @@ DEC_ID_ARR: ID
                     errorFound = true;
                 }
                 else if ($3.type == NULLVOID) {
-                    cout << "Line no. " << yylineno << ": Cannot assign void to non-void type " << string($1) << endl;
+                    cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": Cannot assign void to non-void type " << string($1) << endl;
                     errorFound = true;
                 }
                 else {
@@ -622,12 +626,14 @@ DEC_ID_ARR: ID
                     if (resultType == INTEGER && $3.type == FLOATING) {
                         registerName = tempSet.getRegister();
                         string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
+                        cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                         gen(functionInstruction, s, nextquad);
                         tempSet.freeRegister(*($3.registerName));
                     }
                     else if(resultType == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
                         registerName = tempSet.getFloatRegister();
-                        string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
+                        string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")"; 
+                        cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                         gen(functionInstruction, s, nextquad); 
                         tempSet.freeRegister(*($3.registerName));
                     }
@@ -643,7 +649,7 @@ DEC_ID_ARR: ID
             }
         }
         else if(scope == 0){
-            printf("ID assignments not allowed in global level : Variable %s \n", $1);
+            cout << BOLD(FRED("ERROR : ")) << "Line No " << yylineno << ": ID assignments not allowed in global level : Variable " << string($1) << endl;
             errorFound = true;
         }
         else {
@@ -658,7 +664,7 @@ DEC_ID_ARR: ID
             searchVariable(string($1), activeFuncPtr, found, vn,scope); 
             if (found) {
                 if(vn->isValid==true){
-                    printf("Line no. %d: Variable %s already declared at same level %d\n", yylineno, $1, scope);
+                    cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": Variable " << string($1) << " already declared at same level " << scope << endl;
                 }
                 else{
                     if(vn->eleType == resultType){
@@ -695,7 +701,7 @@ DEC_ID_ARR: ID
                 typeRecord* pn = NULL;
                 searchParam(string($1), activeFuncPtr->parameterList, found, pn);
                 if (found) {
-                    printf("Line no. %d: Vaiable %s is already declared as a parameter with scope %d\n", yylineno, $1, scope);
+                    cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": Variable " << string($1) << " already declared at parameter level " << endl;
                 } 
                 else {
                     varRecord = new typeRecord;
@@ -734,7 +740,7 @@ DEC_ID_ARR: ID
             typeRecord* vn = NULL;
             searchGlobalVariable(string($1), globalVariables, found, vn, scope);
             if (found) {
-                printf("Variable %s already declared at global level \n", $1);
+                cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": Variable " << string($1) << " already declared at global level " << endl;
             }
             else{
                 varRecord = new typeRecord;
@@ -784,17 +790,17 @@ FUNC_CALL: ID LP PARAMLIST RP
         searchVariable(callFuncPtr->name,activeFuncPtr,vfound,vn,scope);
         if (vfound) {
             $$.type = ERRORTYPE;
-            cout<< "Line no." << yylineno << ": called object "<< callFuncPtr->name << " is not a function or function pointer"<< endl;
+            cout<< BOLD(FRED("ERROR : ")) << "Line no." << yylineno << ": called object "<< callFuncPtr->name << " is not a function or function pointer"<< endl;
         }
         else {
             compareFunc(callFuncPtr,funcEntryRecord,found);
             $$.type = ERRORTYPE;
             if (found == 0) {
-                cout << "Line no. " << yylineno << ":  ";
+                cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ":  ";
                 cout << "No function with name " << string($1) << " exists" << endl;
             }
             else if (found == -1) {
-                cout << "Line no. " << yylineno << ":  ";
+                cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ":  ";
                 cout << "call parameter list does not match with defined paramters of function " << string($1) << endl;
             }
             else {
@@ -814,7 +820,7 @@ FUNC_CALL: ID LP PARAMLIST RP
                     gen(functionInstruction, "call _" + callFuncPtr->name + ", " + to_string(typeRecordList.size()), nextquad);      
                 }
                 else {
-                    cout << "Line no. " << yylineno << ": Illegal return type of function " << callFuncPtr->name << endl;
+                    cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": Illegal return type of function " << callFuncPtr->name << endl;
                 }
             }
         }
@@ -885,7 +891,7 @@ ASG: CONDITION1
             errorFound = true;
         }
         else if ($3.type == NULLVOID) {
-            cout << "Line no. " << yylineno << ":  ";
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ":  ";
             cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
             $$.type = ERRORTYPE;
             errorFound = true;
@@ -896,12 +902,14 @@ ASG: CONDITION1
             if ($1.type == INTEGER && $3.type == FLOATING) {
                 registerName = tempSet.getRegister();
                 string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
+                cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                 gen(functionInstruction, s, nextquad);
                 tempSet.freeRegister(*($3.registerName));
             }
             else if($1.type == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
                 registerName = tempSet.getFloatRegister();
                 string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
+                cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                 gen(functionInstruction, s, nextquad); 
                 tempSet.freeRegister(*($3.registerName));
             }
@@ -921,7 +929,7 @@ ASG: CONDITION1
             errorFound = true;
         }
         else if ($3.type == NULLVOID) {
-            cout << "Line no. " << yylineno << ":  ";
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ":  ";
             cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
             $$.type = ERRORTYPE;
             errorFound = true;
@@ -931,13 +939,15 @@ ASG: CONDITION1
             string registerName;
             if ($1.type == INTEGER && $3.type == FLOATING) {
                 registerName = tempSet.getRegister();
-                string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
+                string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";  
+                cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                 gen(functionInstruction, s, nextquad);
                 tempSet.freeRegister(*($3.registerName));
             }
             else if($1.type == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
                 registerName = tempSet.getFloatRegister();
                 string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
+                cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                 gen(functionInstruction, s, nextquad); 
                 tempSet.freeRegister(*($3.registerName));
             }
@@ -971,7 +981,7 @@ ASG: CONDITION1
             errorFound = true;
         }
         else if ($3.type == NULLVOID) {
-            cout << "Line no. " << yylineno << ":  ";
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ":  ";
             cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
             $$.type = ERRORTYPE;
             errorFound = true;
@@ -982,12 +992,14 @@ ASG: CONDITION1
             if ($1.type == INTEGER && $3.type == FLOATING) {
                 registerName = tempSet.getRegister();
                 string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
+                cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                 gen(functionInstruction, s, nextquad);
                 tempSet.freeRegister(*($3.registerName));
             }
             else if($1.type == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
                 registerName = tempSet.getFloatRegister();
-                string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
+                string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")"; 
+                cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                 gen(functionInstruction, s, nextquad); 
                 tempSet.freeRegister(*($3.registerName));
             }
@@ -1021,7 +1033,7 @@ ASG: CONDITION1
             errorFound = true;
         }
         else if ($3.type == NULLVOID) {
-            cout << "Line no. " << yylineno << ":  ";
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ":  ";
             cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
             $$.type = ERRORTYPE;
             errorFound = true;
@@ -1031,13 +1043,15 @@ ASG: CONDITION1
             string registerName;
             if ($1.type == INTEGER && $3.type == FLOATING) {
                 registerName = tempSet.getRegister();
-                string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
+                string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")"; 
+                cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                 gen(functionInstruction, s, nextquad);
                 tempSet.freeRegister(*($3.registerName));
             }
             else if($1.type == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
                 registerName = tempSet.getFloatRegister();
-                string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
+                string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";  
+                cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                 gen(functionInstruction, s, nextquad); 
                 tempSet.freeRegister(*($3.registerName));
             }
@@ -1071,7 +1085,7 @@ ASG: CONDITION1
             errorFound = true;
         }
         else if ($3.type == NULLVOID) {
-            cout << "Line no. " << yylineno << ":  ";
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ":  ";
             cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
             $$.type = ERRORTYPE;
             errorFound = true;
@@ -1082,12 +1096,14 @@ ASG: CONDITION1
             if ($1.type == INTEGER && $3.type == FLOATING) {
                 registerName = tempSet.getRegister();
                 string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
+                cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                 gen(functionInstruction, s, nextquad);
                 tempSet.freeRegister(*($3.registerName));
             }
             else if($1.type == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
                 registerName = tempSet.getFloatRegister();
                 string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
+                cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                 gen(functionInstruction, s, nextquad); 
                 tempSet.freeRegister(*($3.registerName));
             }
@@ -1121,7 +1137,7 @@ ASG: CONDITION1
             errorFound = true;
         }
         else if ($3.type == NULLVOID) {
-            cout << "Line no. " << yylineno << ":  ";
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ":  ";
             cout << "Cannot assign void to non-void type " << *($1.registerName) << endl;
             $$.type = ERRORTYPE;
             errorFound = true;
@@ -1132,12 +1148,14 @@ ASG: CONDITION1
             if ($1.type == INTEGER && $3.type == FLOATING) {
                 registerName = tempSet.getRegister();
                 string s = registerName + " = convertToInt(" + (*($3.registerName)) + ")";   
+                cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                 gen(functionInstruction, s, nextquad);
                 tempSet.freeRegister(*($3.registerName));
             }
             else if($1.type == FLOATING && ($3.type == INTEGER || $3.type == BOOLEAN)) {
                 registerName = tempSet.getFloatRegister();
                 string s = registerName + " = convertToFloat(" + (*($3.registerName)) + ")";   
+                cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                 gen(functionInstruction, s, nextquad); 
                 tempSet.freeRegister(*($3.registerName));
             }
@@ -1364,7 +1382,7 @@ FOREXP: FOR LP ASG1 SEMI M3 ASG1 Q3 {
     {
         errorFound = 1;
         $$.falseList = new vector<int>;
-        cout << "Line no. " << yylineno << ": Syntax error in for loop, discarded token till RP" << endl;
+        cout << BOLD(FRED("ERROR : ")) << FYEL("Line no. " + to_string(yylineno) + ": Syntax error in for loop, discarded token till RP") << endl;
         scope++;
     }
 ;
@@ -1433,7 +1451,7 @@ IFEXP: IF LP ASG RP
             $$.falseList = new vector <int>;
             $$.falseList->push_back(nextquad);
             if($3.type == NULLVOID){
-                cout << "Line no. " << yylineno << "condition in if statement can't be empty" << endl;
+                cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << "condition in if statement can't be empty" << endl;
                 errorFound=true;
             }
             gen(functionInstruction, "if "+ (*($3.registerName)) + " == 0 goto L", nextquad);
@@ -1445,7 +1463,7 @@ IFEXP: IF LP ASG RP
     {
         errorFound = 1;
         $$.falseList = new vector <int>;
-        cout << "Line no. " << yylineno << ": Syntax error in if, discarding tokens till RP" << endl;
+        cout << BOLD(FRED("ERROR : ")) << FYEL("Line no. " + to_string(yylineno) + ": Syntax error in if, discarding tokens till RP") << endl;
         scope++;
     }
 ;
@@ -1470,7 +1488,7 @@ WHILEEXP: WHILE M1 LP ASG RP
     {
         scope++;
         if($4.type == NULLVOID || $4.type == ERRORTYPE){
-            cout << "Line no. " << yylineno << ":  ";
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ":  ";
             cout<<"Expression in if statement can't be empty"<<endl;
             errorFound = true;
         }
@@ -1484,7 +1502,7 @@ WHILEEXP: WHILE M1 LP ASG RP
     | WHILE error RP
     {   
         $$.falseList = new vector<int>;
-        cout << "Line no. " << yylineno << ": Syntax error in while loop, discarding tokens till RP" << endl;
+        cout << BOLD(FRED("ERROR : ")) << FYEL("Line no. " + to_string(yylineno) + ": Syntax error in while loop, discarding tokens till RP") << endl;
         scope++;
     }
 ;
@@ -1510,7 +1528,7 @@ CONDITION1: CONDITION1 TP1
         }
         else if($1.type == NULLVOID || $5.type == NULLVOID){
             $$.type = ERRORTYPE;
-            cout << "Line no. "<< yylineno << ": Both the expessions should not be NULL" << endl;
+            cout << BOLD(FRED("ERROR : ")) << "Line no. "<< yylineno << ": Both the expessions should not be NULL" << endl;
         }
         else{
             $$.type = BOOLEAN;
@@ -1575,7 +1593,7 @@ CONDITION2: CONDITION2 TP1
         }
         else if($1.type == NULLVOID || $5.type == NULLVOID){
             $$.type = ERRORTYPE;
-            cout << "Line no. "<< yylineno << ": Both the expessions should not be NULL" << endl;
+            cout << BOLD(FRED("ERROR : ")) << "Line no. "<< yylineno << ": Both the expessions should not be NULL" << endl;
         }
         else{
             $$.type = BOOLEAN;
@@ -1630,7 +1648,7 @@ EXPR21: EXPR2 EQUAL EXPR2
         }
         else if($1.type == NULLVOID || $3.type == NULLVOID){
             $$.type = ERRORTYPE;
-            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
+            cout << BOLD(FRED("ERROR : ")) << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
         }
         else {
             $$.type = BOOLEAN;
@@ -1648,7 +1666,7 @@ EXPR21: EXPR2 EQUAL EXPR2
         }
         else if($1.type == NULLVOID || $3.type == NULLVOID){
             $$.type = ERRORTYPE;
-            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
+            cout << BOLD(FRED("ERROR : ")) << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
         }
         else{
             $$.type = BOOLEAN;
@@ -1666,7 +1684,7 @@ EXPR21: EXPR2 EQUAL EXPR2
         }
         else if($1.type == NULLVOID || $3.type == NULLVOID){
             $$.type = ERRORTYPE;
-            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
+            cout << BOLD(FRED("ERROR : ")) << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
         }
         else{
             $$.type = BOOLEAN;
@@ -1684,7 +1702,7 @@ EXPR21: EXPR2 EQUAL EXPR2
         }
         else if($1.type == NULLVOID || $3.type == NULLVOID){
             $$.type = ERRORTYPE;
-            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
+            cout << BOLD(FRED("ERROR : ")) << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
         }
         else{
             $$.type = BOOLEAN;
@@ -1703,7 +1721,7 @@ EXPR21: EXPR2 EQUAL EXPR2
         }
         else if($1.type == NULLVOID || $3.type == NULLVOID){
             $$.type = ERRORTYPE;
-            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
+            cout << BOLD(FRED("ERROR : ")) << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
         }
         else{
             $$.type = BOOLEAN;
@@ -1721,7 +1739,7 @@ EXPR21: EXPR2 EQUAL EXPR2
         }
         else if($1.type == NULLVOID || $3.type == NULLVOID){
             $$.type = ERRORTYPE;
-            cout << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
+            cout << BOLD(FRED("ERROR : ")) << "Line no. "<< yylineno << ":Both the expessions should not be  NULL" << endl;
         }
         else{
             $$.type = BOOLEAN;
@@ -1760,6 +1778,7 @@ EXPR2:  EXPR2 PLUS TERM
                 if ($1.type == INTEGER && $3.type == FLOATING) {
                     string newReg = tempSet.getFloatRegister();
                     string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ")";
+                    cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                     tempSet.freeRegister(*($1.registerName));
                     $1.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
@@ -1767,6 +1786,7 @@ EXPR2:  EXPR2 PLUS TERM
                 else if ($1.type == FLOATING && $3.type == INTEGER) {
                     string newReg = tempSet.getFloatRegister();
                     string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ")";
+                    cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                     tempSet.freeRegister(*($3.registerName));
                     $3.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
@@ -1783,7 +1803,7 @@ EXPR2:  EXPR2 PLUS TERM
                 tempSet.freeRegister(*($3.registerName));   
             }
             else {
-                cout << "Line no. " << yylineno << ":  ";
+                cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ":  ";
                 cout << "Type mismatch in expression" << endl;
                 $$.type = ERRORTYPE;
             }
@@ -1802,6 +1822,7 @@ EXPR2:  EXPR2 PLUS TERM
                 if ($1.type == INTEGER && $3.type == FLOATING) {
                     string newReg = tempSet.getFloatRegister();
                     string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ")";
+                    cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                     tempSet.freeRegister(*($1.registerName));
                     $1.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
@@ -1809,6 +1830,7 @@ EXPR2:  EXPR2 PLUS TERM
                 else if ($1.type == FLOATING && $3.type == INTEGER) {
                     string newReg = tempSet.getFloatRegister();
                     string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ")";
+                    cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                     tempSet.freeRegister(*($3.registerName));
                     $3.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
@@ -1825,7 +1847,7 @@ EXPR2:  EXPR2 PLUS TERM
                 tempSet.freeRegister(*($3.registerName));   
             }
             else {
-                cout << "Line no. " << yylineno << ":  ";
+                cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ":  ";
                 cout << "Type mismatch in expression" << endl;
                 $$.type = ERRORTYPE;
             }
@@ -1858,6 +1880,7 @@ TERM: TERM MUL FACTOR
                 if ($1.type == INTEGER && $3.type == FLOATING) {
                     string newReg = tempSet.getFloatRegister();
                     string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ")";
+                    cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                     tempSet.freeRegister(*($1.registerName));
                     $1.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
@@ -1865,6 +1888,7 @@ TERM: TERM MUL FACTOR
                 else if ($1.type == FLOATING && $3.type == INTEGER) {
                     string newReg = tempSet.getFloatRegister();
                     string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ")";
+                    cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                     tempSet.freeRegister(*($3.registerName));
                     $3.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
@@ -1881,7 +1905,7 @@ TERM: TERM MUL FACTOR
                 tempSet.freeRegister(*($3.registerName));   
             }
             else {
-                cout << "Line no. " << yylineno << ":  ";
+                cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ":  ";
                 cout << "Type mismatch in expression" << endl;
                 $$.type = ERRORTYPE;
             }
@@ -1899,6 +1923,7 @@ TERM: TERM MUL FACTOR
                 if ($1.type == INTEGER && $3.type == FLOATING) {
                     string newReg = tempSet.getFloatRegister();
                     string s = newReg + " = " + "convertToFloat(" + (*($1.registerName)) + ")";
+                    cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                     tempSet.freeRegister(*($1.registerName));
                     $1.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
@@ -1906,6 +1931,7 @@ TERM: TERM MUL FACTOR
                 else if ($1.type == FLOATING && $3.type == INTEGER) {
                     string newReg = tempSet.getFloatRegister();
                     string s = newReg + " = " + "convertToFloat(" + (*($3.registerName)) + ")";
+                    cout << BOLD(FBLU("Warning : ")) << FCYN("Line No. "+to_string(yylineno)+":Implicit Type Conversion") << endl;
                     tempSet.freeRegister(*($3.registerName));
                     $3.registerName = &newReg;
                     gen(functionInstruction, s, nextquad);
@@ -1922,7 +1948,7 @@ TERM: TERM MUL FACTOR
                 tempSet.freeRegister(*($3.registerName));   
             }
             else {
-                cout << "Line no. " << yylineno << ": ";
+                cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": ";
                 cout << "Type mismatch in expression" << endl;
                 $$.type = ERRORTYPE;
             }
@@ -1943,7 +1969,7 @@ TERM: TERM MUL FACTOR
                 tempSet.freeRegister(*($3.registerName));   
             }
             else {
-                cout << "Line no. " << yylineno << ": ";
+                cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": ";
                 cout << "Type mismatch in expression" << endl;
                 $$.type = ERRORTYPE;
             }
@@ -2079,7 +2105,7 @@ FACTOR: ID_ARR
         }
         else {
             $$.type = ERRORTYPE;
-            cout << "Line no. " << yylineno << ": ";
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": ";
             cout << "Cannot increment non-integer type variable "<< *($1.registerName) << endl; 
         }
     } 
@@ -2103,7 +2129,7 @@ FACTOR: ID_ARR
         }
         else {
             $$.type = ERRORTYPE;
-            cout << "Line no. " << yylineno << ": ";
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": ";
             cout << "Cannot increment non-integer type variable " << *($1.registerName) << endl; 
         }
     } 
@@ -2127,7 +2153,7 @@ FACTOR: ID_ARR
         }
         else {
             $$.type = ERRORTYPE;
-            cout << "Line no. " << yylineno << ": ";
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": ";
             cout << "Cannot increment non-integer type variable "<<*($2.registerName) << endl; 
         }
     } 
@@ -2151,7 +2177,7 @@ FACTOR: ID_ARR
         }
         else {
             $$.type = ERRORTYPE;
-            cout << "Line no. " << yylineno << ": ";
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": ";
             cout << "Cannot increment non-integer type variable " << *($2.registerName) << endl; 
         }
     }
@@ -2173,7 +2199,7 @@ ID_ARR: ID
             }
             else {
                 $$.type = ERRORTYPE;
-                cout << "Line no. " << yylineno << ":  ";
+                cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ":  ";
                 cout << $1 << " is declared as an array but is being used as a singleton" << endl; 
             }
         }
@@ -2189,13 +2215,13 @@ ID_ARR: ID
                 }
                 else {
                     $$.type = ERRORTYPE;
-                    cout << "Line no. " << yylineno << ": ";
+                    cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": ";
                     cout << $1 << " is declared as an array but is being used as a singleton" << endl;
                 }
             }
             else {
                 $$.type = ERRORTYPE;
-                cout << "Line no. " << yylineno << ": ";
+                cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": ";
                 cout << "Undeclared identifier " << $1 << endl;
             }
         }
@@ -2245,19 +2271,19 @@ ID_ARR: ID
                     }
                     else {
                         $$.type = ERRORTYPE;
-                        cout << "Line no. " << yylineno << ": ";
+                        cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": ";
                         cout << "Dimension mismatch: " << $1 << " should have " << dimlist.size() <<" dimensions" << endl;
                     }
                 }
                 else {
                     $$.type = ERRORTYPE;
-                    cout << "Line no. " << yylineno << ": ";
-                    cout << $1 << " is declared as a singleton but is being used as an array" << endl; 
+                    cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": ";
+                    cout << string($1) << " is declared as a singleton but is being used as an array" << endl; 
                 }
             }
             else {
                 $$.type = ERRORTYPE;
-                cout << "Line no. " << yylineno << ": ";
+                cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": ";
                 cout << "Undeclared identifier " << $1 << endl;
             }
             dimlist.clear();
@@ -2271,7 +2297,7 @@ BR_DIMLIST: LSB ASG RSB
             dimlist.push_back(*($2.registerName));
         }
         else {
-            cout << "Line no. " << yylineno << ": ";
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": ";
             cout << "One of the dimension of an array cannot be evaluated to integer" << endl;
         }
     }    
@@ -2281,7 +2307,7 @@ BR_DIMLIST: LSB ASG RSB
             dimlist.push_back(*($3.registerName));
         }
         else {
-            cout << "Line no. " << yylineno << ": ";
+            cout << BOLD(FRED("ERROR : ")) << "Line no. " << yylineno << ": ";
             cout << "One of the dimension of an array cannot be evaluated to integer" << endl;
         }  
     }
@@ -2314,8 +2340,9 @@ int main(int argc, char **argv)
         for(auto it:functionInstruction){
             outinter<<it<<endl;
         }
+        cout << BOLD(FGRN("Intermediate Code Generated")) << endl;
     } else {
-        cout << "Exited without intermediate code generation" << endl;
+        cout << BOLD(FRED("Exited without intermediate code generation")) << endl;
     }
     outinter.close();
 }
