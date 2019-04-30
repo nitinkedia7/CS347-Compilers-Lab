@@ -1,12 +1,8 @@
 int main(){
     int n;
     read n;
-    int i;
-    int A[100];
-    for(i=0;i<n;i++){
-        read A[i];
+    while (n--) {
+        print n;
     }
-    for(i=0;i<n;i++){
-        print A[i];
-    }
+    return 0;
 }

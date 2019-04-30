@@ -8,9 +8,6 @@ int main() {
         read A[i];
     }
     for (i = 0; i < n; i++) {
-        print A[i];
-    }
-    for (i = 0; i < n; i++) {
         for (j = 1; j < n-i; j++) {
             if (A[j-1] > A[j]) {
                 int temp ;

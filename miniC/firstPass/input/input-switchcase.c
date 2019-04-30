@@ -1,19 +1,20 @@
 int main(){
-    int a=1,b;
+    int a,b;
     int c;
-    switch(a=b=3&&0){
+    c = 5;
+    read a;
+    read b;
+    switch(a+b){
         case 1:{
             int c=1;
         }
-        break;
+            break;
         case 0:
-            b=2;
             break;
         default:
             c=2;
     }
-    print a;
-    print b;
+
     switch(a+b){
         case 1: a=2;break;
         case 2: b=1;
@@ -22,4 +23,6 @@ int main(){
     }
     print a;
     print b;
+    print c;
+    return 0;
 }

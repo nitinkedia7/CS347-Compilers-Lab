@@ -15,12 +15,6 @@ int main(){
     }
     int i;
     i = min(n,10)-1;
-    while(i--){
-        read arr[i];
-    }
-    i = min(n,10) - 1;
-    while(i--){
-        print arr[i];
-    }
+    print i;
     return 0;
 }

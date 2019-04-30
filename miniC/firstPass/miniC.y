@@ -291,6 +291,9 @@ STMT: VAR_DECL
         $$.nextList = new vector<int>;
         $$.breakList = new vector<int>;
         $$.continueList = new vector <int>;
+        merge($$.continueList, $1.continueList);
+        merge($$.breakList, $1.breakList);
+
     }
     | WHILESTMT
     {
@@ -311,6 +314,8 @@ STMT: VAR_DECL
         $$.continueList = new vector <int>;
         deleteVarList(activeFuncPtr, scope);
         scope--;
+        merge($$.continueList, $3.continueList);
+        merge($$.breakList, $3.breakList);
     }
     | BREAK SEMI
     {

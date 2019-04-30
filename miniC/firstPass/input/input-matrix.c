@@ -6,7 +6,7 @@ int main() {
         for (i = 0; i < 5; i++) {
             int j;
             for (j = 0; j < 5; j++) {
-                if (1) {
+                if (i==j) {
                     A[i][j] = i+j;
                     B[i][j] = i+j;
                 }
